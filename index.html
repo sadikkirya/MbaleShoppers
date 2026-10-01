@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Mbale Shopper — compare products and prices from shops across Mbale, Uganda, then shop from one convenient marketplace.">
+<title>Mbale Shopper — Compare. Choose. Shop.</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="topbar"><span>🇺🇬 Mbale's local marketplace • Compare prices from participating shops</span><span>Sell on Mbale Shopper &nbsp; | &nbsp; Help &nbsp; | &nbsp; Track order</span></div>
+
+<header class="header">
+  <div class="headrow">
+    <a class="logo" href="#" onclick="goHome()"><span class="logoMark">M</span>Mbale Shopper</a>
+    <div class="search">
+      <select id="searchCat"><option value="all">All categories</option><option>Electronics</option><option>Phones</option><option>Fashion</option><option>Grocery</option><option>Home</option><option>Beauty</option><option>Kids</option></select>
+      <input id="searchInput" placeholder="Search products and brands in Mbale..." oninput="renderCatalog()">
+      <button onclick="renderCatalog()">⌕</button>
+    </div>
+    <div class="headActions">
+      <button class="action hideMob" onclick="showAccount()">👤 <span>Account</span></button>
+      <button class="action hideMob" onclick="showOrders()">📦 <span>Orders</span></button>
+      <button class="action cartBtn" onclick="toggleCart()">🛒 <span class="hideMob">Cart</span><b class="badge" id="cartCount">0</b></button>
+    </div>
+  </div>
+</header>
+<nav class="nav">
+  <a href="#" onclick="goHome()">Home</a><a href="#catalog">Shop All</a><a href="#deals">Today's Deals</a><a href="#" onclick="filterCategory('Electronics')">Electronics</a><a href="#" onclick="filterCategory('Phones')">Phones</a><a href="#" onclick="filterCategory('Fashion')">Fashion</a><a href="#" onclick="filterCategory('Grocery')">Grocery</a><a href="#" onclick="filterCategory('Home')">Home & Kitchen</a><a href="#" onclick="showSell()">Sell on Mbale Shopper</a>
+</nav>
+
+<main class="container">
+<section class="hero">
+  <div class="heroMain">
+    <h1>Compare Mbale prices. Shop with confidence.</h1>
+    <p>Discover everyday finds, compare prices across Mbale sellers and choose the product and delivery option that works for you.</p>
+    <button class="cta" onclick="document.getElementById('catalog').scrollIntoView()">Shop products →</button>
+  </div>
+  <div class="heroSide">
+    <div class="promo"><h3>🔎 Price comparison</h3><p>See offers from different Mbale sellers on the same product before you buy.</p></div>
+    <div class="promo dark"><h3>🚚 Flexible delivery</h3><p>Pickup and delivery options are shown with every product.</p></div>
+  </div>
+</section>
+
+<section class="section">
+<div class="sectionHead"><h2>Shop by category</h2><button onclick="filterCategory('all')">View all</button></div>
+<div class="catgrid" id="categories"></div>
+</section>
+
+<section class="section" id="deals">
+<div class="sectionHead"><h2>Deals & popular picks</h2><button onclick="filterDeals()">View all</button></div>
+<div class="deals" id="dealGrid"></div>
+</section>
+
+<section class="section" id="catalog">
+<div class="sectionHead"><h2>Explore products</h2><span id="resultCount" style="font-size:12px;color:#667085"></span></div>
+<div class="contentGrid">
+  <aside class="filters">
+    <h3>Filters</h3>
+    <div class="filterGroup"><b style="font-size:12px">Category</b><label><input type="checkbox" value="Electronics" onchange="renderCatalog()"> Electronics</label><label><input type="checkbox" value="Phones" onchange="renderCatalog()"> Phones</label><label><input type="checkbox" value="Fashion" onchange="renderCatalog()"> Fashion</label><label><input type="checkbox" value="Grocery" onchange="renderCatalog()"> Grocery</label><label><input type="checkbox" value="Home" onchange="renderCatalog()"> Home</label></div>
+    <div class="filterGroup"><b style="font-size:12px">Price</b><input type="range" id="priceRange" min="1000" max="2000000" step="1000" value="2000000" oninput="renderCatalog()"><div style="display:flex;justify-content:space-between;font-size:11px"><span>UGX 1k</span><span id="rangeVal">2M+</span></div></div>
+    <div class="filterGroup"><b style="font-size:12px">Seller</b><select id="sellerFilter" onchange="renderCatalog()" style="width:100%;margin-top:7px;padding:8px;border:1px solid var(--line);border-radius:7px"><option value="all">All shops</option></select></div>
+    <button class="primary" style="width:100%;margin-top:10px" onclick="clearFilters()">Clear filters</button>
+  </aside>
+  <div>
+    <div class="catalogTop"><b id="catalogTitle">All products</b><select id="sort" onchange="renderCatalog()"><option value="featured">Featured</option><option value="priceLow">Price: Low to high</option><option value="priceHigh">Price: High to low</option><option value="rating">Top rated</option></select></div>
+    <div class="grid" id="catalogGrid"></div>
+  </div>
+</div>
+</section>
+</main>
+
+<footer class="footer">
+<div class="footerGrid">
+<div><div class="logo" style="color:#fff"><span class="logoMark">M</span>Mbale Shopper</div><p>A local-first marketplace concept for comparing products and prices from shops in Mbale, Uganda.</p><p><b>Important:</b> product prices in this demo are illustrative and should be verified with the seller before payment.</p></div>
+<div><h3>Shop</h3><ul><li>All products</li><li>Deals</li><li>Electronics</li><li>Fashion</li><li>Groceries</li></ul></div>
+<div><h3>Customer care</h3><ul><li onclick="showPolicy('returns')">Returns</li><li onclick="showPolicy('terms')">Terms & conditions</li><li onclick="showPolicy('privacy')">Privacy</li><li>Help centre</li></ul></div>
+<div><h3>For sellers</h3><ul><li onclick="showSell()">Sell on Mbale Shopper</li><li>Seller dashboard</li><li>Pricing & fees</li><li>Seller policies</li></ul></div>
+<div><h3>Contact</h3><p>Mbale, Uganda</p><p>support@mbaleshopper.example</p><p>+256 700 000 000</p></div>
+</div>
+<div class="partnerRecognition">
+  <section class="partnerGroup"><h3>Partner shops</h3><div class="partnerList" id="partnerShopList"></div></section>
+  <section class="partnerGroup"><h3>Delivery partners</h3><div class="partnerList" id="deliveryPartnerList"></div></section>
+</div>
+<div class="copy">© 2026 Mbale Shopper • Demo marketplace UI • Built with HTML, CSS & JavaScript</div>
+</footer>
+
+<div class="modalWrap" id="modalWrap" onclick="if(event.target===this)closeModal()"><div class="modal" id="modal"></div></div>
+<aside class="drawer" id="cartDrawer"><div class="drawerHead"><b>Shopping cart</b><button onclick="toggleCart()">✕</button></div><div class="cartItems" id="cartItems"></div><div class="drawerFoot"><div class="total"><span>Total</span><span id="cartTotal">UGX 0</span></div><button class="yellowBtn" style="width:100%" onclick="checkout()">Proceed to checkout</button></div></aside>
+<div class="toast" id="toast"></div>
+
+<script src="app.js" defer></script>
+</body>
+</html>
