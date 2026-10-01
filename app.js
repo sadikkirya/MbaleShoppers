@@ -270,8 +270,28 @@ function renderCategoryMegaMenu(category){
  menu.classList.add("show");menu.setAttribute("aria-hidden","false");
 }
 function scheduleMegaMenuClose(){clearTimeout(megaMenuCloseTimer);megaMenuCloseTimer=setTimeout(()=>{const menu=el("categoryMegaMenu");menu.classList.remove("show");menu.setAttribute("aria-hidden","true")},180)}
+function updateCategoryNavArrows(){
+ const scroller=el("navScroller");
+ if(!scroller)return;
+ el("navScrollLeft").hidden=scroller.scrollLeft<=1;
+ el("navScrollRight").hidden=scroller.scrollLeft+scroller.clientWidth>=scroller.scrollWidth-1;
+}
+function scrollCategoryNav(direction){
+ const scroller=el("navScroller");
+ if(scroller)scroller.scrollBy({left:direction*Math.max(180,scroller.clientWidth*.72),behavior:"smooth"});
+}
 function initCategoryMegaMenu(){
  const menu=el("categoryMegaMenu");
+ const nav=menu.parentElement,links=[...nav.querySelectorAll(":scope > a")],scroller=document.createElement("div");
+ scroller.id="navScroller";scroller.className="navScroller";
+ links.forEach(link=>scroller.append(link));
+ const leftArrow=document.createElement("button"),rightArrow=document.createElement("button");
+ leftArrow.id="navScrollLeft";leftArrow.type="button";leftArrow.className="navScrollArrow";leftArrow.setAttribute("aria-label","Scroll navigation left");leftArrow.innerHTML="←";leftArrow.onclick=()=>scrollCategoryNav(-1);
+ rightArrow.id="navScrollRight";rightArrow.type="button";rightArrow.className="navScrollArrow";rightArrow.setAttribute("aria-label","Scroll navigation right");rightArrow.innerHTML="→";rightArrow.onclick=()=>scrollCategoryNav(1);
+ nav.prepend(leftArrow);nav.insertBefore(scroller,menu);nav.insertBefore(rightArrow,menu);
+ scroller.addEventListener("scroll",updateCategoryNavArrows,{passive:true});
+ window.addEventListener("resize",updateCategoryNavArrows);
+ requestAnimationFrame(updateCategoryNavArrows);
  document.querySelectorAll('.categoryNavLink[data-category="Phones"], .categoryNavLink[data-category="Computers & Gaming"]').forEach(link=>link.remove());
  document.querySelectorAll(".categoryNavLink").forEach(link=>{link.addEventListener("mouseenter",()=>{clearTimeout(megaMenuCloseTimer);renderCategoryMegaMenu(link.dataset.category)});link.addEventListener("mouseleave",scheduleMegaMenuClose)});
  menu.addEventListener("mouseenter",()=>clearTimeout(megaMenuCloseTimer));menu.addEventListener("mouseleave",scheduleMegaMenuClose);
