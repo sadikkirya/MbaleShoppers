@@ -13,9 +13,9 @@
 <header class="header">
   <div class="headrow">
     <a class="logo" href="#" onclick="goHome()"><span class="logoMark">M</span>Mbale Shopper</a>
-    <div class="search" onclick="event.stopPropagation()">
+    <div class="search" id="searchBox" onclick="event.stopPropagation()">
       <select id="searchCat" aria-label="Search category"><option value="all">All categories</option></select>
-      <input id="searchInput" role="combobox" aria-autocomplete="list" aria-controls="searchSuggestions" aria-expanded="false" placeholder="Search products and brands in Mbale..." oninput="handleSearchInput(event)" onfocus="handleSearchFocus()" onkeydown="handleSearchKeydown(event)">
+      <div class="searchInputWrap"><span class="searchPromptViewport" aria-hidden="true"><span class="searchPromptTrack" id="searchPromptTrack"></span></span><input id="searchInput" aria-label="Search products, services and brands in Mbale" role="combobox" aria-autocomplete="list" aria-controls="searchSuggestions" aria-expanded="false" placeholder="" oninput="handleSearchInput(event)" onfocus="handleSearchFocus()" onblur="resumeSearchPromptRotation()" onkeydown="handleSearchKeydown(event)"></div>
       <button aria-label="Search products" onclick="submitSearch()">⌕</button>
       <div class="searchSuggestions" id="searchSuggestions" role="listbox" hidden></div>
     </div>
@@ -27,7 +27,7 @@
   </div>
 </header>
 <nav class="nav">
-  <a href="#" onclick="goHome()">Home</a><a href="#catalog">Shop All</a><a href="#deals">Today's Deals</a><a href="#" onclick="filterCategory('Phones')">Phones</a><a href="#" onclick="filterCategory('Electronics')">Electronics</a><a href="#" onclick="filterCategory('Fashion')">Fashion</a><a href="#" onclick="filterCategory('Grocery')">Grocery</a><a href="#" onclick="filterCategory('Health & Pharmacy')">Health & Pharmacy</a><a href="#" onclick="showSell()">Sell on Mbale Shopper</a>
+  <a href="#" onclick="goHome()">Home</a><a href="#catalog">Shop All</a><a href="#deals">Today's Deals</a><a href="#" onclick="filterCategory('Phones')">Phones</a><a href="#" onclick="filterCategory('Electronics')">Electronics</a><a href="#" onclick="filterCategory('Fashion')">Fashion</a><a href="#" onclick="filterCategory('Grocery')">Grocery</a><a href="#" onclick="filterCategory('Health & Pharmacy')">Health & Pharmacy</a><a href="#services" onclick="filterServiceCategory('all')">Services</a><a href="#services" onclick="filterServiceCategory('Events & catering')">Events</a><a href="#" onclick="showSell()">Sell on Mbale Shopper</a>
 </nav>
 
 <main class="container">
@@ -67,11 +67,12 @@
 
 <section class="section" id="services">
 <div class="sectionHead"><div><span class="eyebrow sectionEyebrow">LOCAL HELP, ONE REQUEST AWAY</span><h2>Services around Mbale</h2><p id="serviceResultLabel">Example service listings · Request a quote directly</p></div><div class="shelfControls"><button class="shelfArrow" aria-label="Scroll services left" onclick="scrollShelf('serviceGrid',-1)">←</button><button class="shelfArrow" aria-label="Scroll services right" onclick="scrollShelf('serviceGrid',1)">→</button></div></div>
+<div class="serviceFilters" id="serviceFilters" role="group" aria-label="Filter services by category"></div>
 <div class="productRail serviceRail" id="serviceGrid"></div>
 </section>
 
 <section class="section" id="catalog">
-<div class="sectionHead"><h2>Explore products</h2><span id="resultCount" style="font-size:12px;color:#667085"></span></div>
+<div class="sectionHead"><div><h2>Explore products</h2><p class="inventoryDisclaimer">Stock and sold figures are sample data; confirm availability with the seller.</p></div><span id="resultCount" style="font-size:12px;color:#667085"></span></div>
 <div class="contentGrid">
   <aside class="filters" id="filters">
     <h3>Filters</h3>

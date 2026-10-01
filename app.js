@@ -30,6 +30,9 @@ const services = [
  {id:"cleaning",name:"Home cleaning",category:"Cleaning",description:"Arrange help with regular home cleaning or a one-time deep clean.",image:"photo-1581578731548-c64695cc6952"},
  {id:"mechanic",name:"Vehicle mechanic",category:"Auto care",description:"Request vehicle inspection, routine service and repair assistance.",image:"photo-1486262715619-67b85e0b08d3"},
  {id:"catering",name:"Event catering",category:"Events & catering",description:"Discuss menus and food service for family or community gatherings.",image:"photo-1556911220-e15b29be8c8f"},
+ {id:"decor",name:"Event decoration",category:"Events & catering",description:"Request ideas and a quote for decor at a celebration or community event.",image:"photo-1530103862676-de8c9debad1d"},
+ {id:"photography",name:"Event photography",category:"Events & catering",description:"Ask about photography coverage for weddings, parties and special occasions.",image:"photo-1542038784456-1ea8e935640e"},
+ {id:"wedding-planning",name:"Wedding planning",category:"Events & catering",description:"Discuss planning support and coordination for your wedding day.",image:"photo-1519741497674-611481863552"},
  {id:"computer",name:"Phone & computer support",category:"Tech support",description:"Get help diagnosing common phone, laptop and setup issues.",image:"photo-1521737711867-e3b97375f902"}
 ];
 const products = [
@@ -66,6 +69,27 @@ const products = [
 {id:31,name:"Adult Dog Food 2kg",cat:"Pet Supplies",shop:"Map Supermarket",price:47000,old:55000,rating:4.2,reviews:19,tag:"PET CARE",delivery:"Store pickup",desc:"Packaged dog food. Check ingredients, feeding guidance and expiry date on the label.",image:img("photo-1589924691995-400dc9ecc119")},
 {id:32,name:"Classic Quartz Wristwatch",cat:"Jewelry & Watches",shop:"MY PHONES MBALE",price:95000,old:115000,rating:4.4,reviews:31,tag:"CLASSIC STYLE",delivery:"Pickup available",desc:"Quartz wristwatch with a versatile everyday design. Confirm colour, materials and warranty with the seller.",image:img("photo-1523275335684-37898b6baf30")}
 ];
+const extraProductImages={
+ "Automotive":["photo-1503376780353-7e6692767b70"],
+ "Jewelry & Watches":["photo-1524592094714-0f0654e20314"]
+};
+const productGalleryImages=new Map(products.map(product=>{
+ const categoryImage=categories.find(category=>category.value===product.cat)?.image;
+ const relatedImages=products.filter(item=>item.cat===product.cat&&item.id!==product.id).map(item=>item.image);
+ const categoryImageUrl=categoryImage?img(categoryImage):null;
+ const additionalImages=(extraProductImages[product.cat]||[]).map(img);
+ return [product.id,[...new Set([product.image,...relatedImages,categoryImageUrl,...additionalImages].filter(Boolean))].slice(0,4)];
+}));
+const demoInventory = [
+ {stock:8,sold:86},{stock:0,sold:61},{stock:16,sold:143},{stock:0,sold:48},
+ {stock:12,sold:37},{stock:9,sold:52},{stock:20,sold:74},{stock:0,sold:56},
+ {stock:4,sold:23},{stock:11,sold:39},{stock:6,sold:42},{stock:18,sold:97},
+ {stock:14,sold:28},{stock:7,sold:34},{stock:24,sold:69},{stock:5,sold:21},
+ {stock:10,sold:47},{stock:13,sold:32},{stock:30,sold:88},{stock:9,sold:41},
+ {stock:6,sold:26},{stock:15,sold:43},{stock:19,sold:58},{stock:8,sold:63},
+ {stock:0,sold:45},{stock:10,sold:29},{stock:22,sold:57},{stock:17,sold:36},
+ {stock:12,sold:31},{stock:28,sold:92},{stock:7,sold:18},{stock:5,sold:27}
+];
 
 const shops = [
 {name:"Bam Shopping Center",type:"Shopping centre",letter:"B",desc:"Multi-category shopping destination in Mbale.",rating:"4.0"},
@@ -89,17 +113,27 @@ const offers = {
   12:[["Mobile Hub Uganda",120000],["P & T ELECTRONICS MBALE",125000],["VIVA ELECTRONICS",132000]]
 };
 let cart=JSON.parse(localStorage.getItem("mbaleCart")||"[]"), wish=JSON.parse(localStorage.getItem("mbaleWish")||"[]"), recentlyViewed=JSON.parse(localStorage.getItem("mbaleRecentlyViewed")||"[]"), currentProduct=null, activeSearchSuggestion=-1, activeServiceCategory="all";
+const searchPromptExamples=[products[0].name,products[2].name,services[0].name,services[5].name,"Health & Pharmacy","Home & Kitchen"];
 
 const money=n=>"UGX "+Number(n).toLocaleString("en-UG");
 const el=id=>document.getElementById(id);
 function save(){localStorage.setItem("mbaleCart",JSON.stringify(cart));localStorage.setItem("mbaleWish",JSON.stringify(wish));updateCartBadge()}
 function toast(t){el("toast").textContent=t;el("toast").classList.add("show");setTimeout(()=>el("toast").classList.remove("show"),2200)}
 function updateCartBadge(){el("cartCount").textContent=cart.reduce((s,x)=>s+x.qty,0)}
+function changeCardImage(button,direction){
+ const imageBox=button.closest(".productImg"),image=imageBox.querySelector(".productGalleryImage"),images=productGalleryImages.get(Number(image.dataset.productId));
+ const nextIndex=(Number(image.dataset.imageIndex)+direction+images.length)%images.length;
+ image.src=images[nextIndex];image.dataset.imageIndex=nextIndex;
+ imageBox.querySelector(".galleryCount").textContent=`${nextIndex+1} / ${images.length}`;
+}
 function productCard(p){
  const liked=wish.includes(p.id);
+ const inventory=demoInventory[p.id-1]||{stock:0,sold:0};
+ const outOfStock=inventory.stock===0;
+ const images=productGalleryImages.get(p.id)||[p.image];
  return `<article class="card" onclick="openProduct(${p.id})">
- <div class="productImg"><img loading="lazy" src="${p.image}" alt="${p.name}"><span class="tag">${p.tag}</span><button class="heart" onclick="event.stopPropagation();toggleWish(${p.id})">${liked?"♥":"♡"}</button></div>
- <div class="cardBody"><div class="rating">★ ${p.rating} <span style="color:#98a2b3">(${p.reviews})</span></div><div class="title">${p.name}</div><div class="seller">Sold by ${p.shop}</div><div class="price">${money(p.price)} <span class="old">${money(p.old)}</span></div><div class="save">Save ${money(p.old-p.price)}</div><div class="delivery">✓ ${p.delivery}</div>${offers[p.id]?`<div class="compare"><span>Compare</span><strong>${offers[p.id].length} offers</strong></div>`:""}<button class="quickAdd" onclick="event.stopPropagation();addToCart(${p.id})">Add to cart</button></div></article>`;
+ <div class="productImg"><img class="productGalleryImage" loading="lazy" data-product-id="${p.id}" data-image-index="0" src="${images[0]}" alt="${p.name}">${images.length>1?`<div class="galleryControls"><button type="button" aria-label="Previous image of ${p.name}" onclick="event.stopPropagation();changeCardImage(this,-1)">‹</button><span class="galleryCount">1 / ${images.length}</span><button type="button" aria-label="Next image of ${p.name}" onclick="event.stopPropagation();changeCardImage(this,1)">›</button></div>`:""}<span class="tag">${p.tag}</span><button class="cartQuick" aria-label="${outOfStock?"Out of stock: ":"Add to cart: "}${p.name}" title="${outOfStock?"Out of stock":"Add to cart"}" ${outOfStock?"disabled":""} onclick="event.stopPropagation();addToCart(${p.id})">🛒</button><button class="heart" aria-label="${liked?"Remove from":"Add to"} wishlist: ${p.name}" onclick="event.stopPropagation();toggleWish(${p.id})">${liked?"♥":"♡"}</button></div>
+ <div class="cardBody"><div class="rating">★ ${p.rating} <span style="color:#98a2b3">(${p.reviews})</span></div><div class="title">${p.name}</div><div class="seller">Sold by ${p.shop}</div><div class="price">${money(p.price)} <span class="old">${money(p.old)}</span></div><div class="save">Save ${money(p.old-p.price)}</div><div class="inventoryMeta"><span class="stockStatus${outOfStock?" outOfStock":""}"><b>Stock:</b> ${outOfStock?"Out of stock":`${inventory.stock} available`}</span><span><b>Sold:</b> ${inventory.sold}</span></div><div class="delivery">✓ ${p.delivery}</div>${offers[p.id]?`<div class="compare"><span>Compare</span><strong>${offers[p.id].length} offers</strong></div>`:""}</div></article>`;
 }
 function renderCategories(){
  el("categories").innerHTML=categories.map(category=>`<button class="cat" onclick="filterCategory('${category.value}')"><img loading="lazy" src="${img(category.image)}" alt=""><span>${category.label}</span></button>`).join("");
@@ -122,12 +156,16 @@ function renderRecommendations(){
 function renderServiceCategories(){
  el("serviceCategoryGrid").innerHTML=serviceCategories.map(category=>`<button class="serviceCategoryTile" onclick="filterServiceCategory('${category.name}')"><img loading="lazy" src="${img(category.image)}" alt=""><span>${category.name}</span></button>`).join("");
 }
+function renderServiceFilters(){
+ const filterOptions=[{name:"all",label:"All services"},...serviceCategories.map(category=>({name:category.name,label:category.name}))];
+ el("serviceFilters").innerHTML=filterOptions.map(option=>`<button class="serviceFilterChip${activeServiceCategory===option.name?" active":""}" aria-pressed="${activeServiceCategory===option.name}" onclick="filterServiceCategory('${option.name}')">${option.label}</button>`).join("");
+}
 function renderServices(){
  const visibleServices=activeServiceCategory==="all"?services:services.filter(service=>service.category===activeServiceCategory);
  el("serviceGrid").innerHTML=visibleServices.map(service=>`<article class="serviceCard"><div class="serviceImage"><img loading="lazy" src="${img(service.image)}" alt="${service.name}"></div><div class="serviceBody"><span class="serviceCategoryLabel">${service.category}</span><h3>${service.name}</h3><p>${service.description}</p><div class="serviceFoot"><small>Example listing · Mbale<br>Quote on request</small><button class="serviceRequest" onclick="requestService('${service.id}')">Request a quote</button></div></div></article>`).join("");
  el("serviceResultLabel").textContent=activeServiceCategory==="all"?"Example service listings · Request a quote directly":`${visibleServices.length} example ${activeServiceCategory.toLowerCase()} listings`;
 }
-function filterServiceCategory(category){activeServiceCategory=category;renderServices();el("services").scrollIntoView({behavior:"smooth"})}
+function filterServiceCategory(category){activeServiceCategory=category;renderServiceFilters();renderServices();el("services").scrollIntoView({behavior:"smooth"})}
 function requestService(id){
  const service=services.find(item=>item.id===id);
  el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><span class="serviceCategoryLabel">${service.category}</span><h2>Request a quote</h2><p style="color:#667085">${service.name}. This demo does not send your request to a real provider.</p><div class="formGrid"><label>Your name<input id="serviceRequestName" placeholder="Full name"></label><label>Phone number<input id="serviceRequestPhone" placeholder="+256 ..."></label><label class="full">Your area in Mbale<input id="serviceRequestArea" placeholder="Area or landmark"></label><label class="full">What do you need?<textarea id="serviceRequestDetails" placeholder="Describe the service and preferred time"></textarea></label></div><button class="yellowBtn" style="margin-top:16px;width:100%" onclick="submitServiceRequest()">Send demo request</button></div>`;
@@ -138,8 +176,16 @@ function submitServiceRequest(){
  closeModal();toast("Demo service request recorded");
 }
 function scrollShelf(id,direction){const shelf=el(id),distance=id==="categories"?shelf.clientWidth*.8:510;shelf.scrollBy({left:direction*distance,behavior:"smooth"})}
-function handleSearchInput(event){renderCatalog();renderSearchSuggestions(event.target.value)}
-function handleSearchFocus(){renderSearchSuggestions(el("searchInput").value)}
+function initSearchPromptTrack(){el("searchPromptTrack").innerHTML=[...searchPromptExamples,searchPromptExamples[0]].map(example=>`<span>Try ${example}</span>`).join("")}
+function pauseSearchPromptRotation(){el("searchPromptTrack").classList.add("paused")}
+function syncSearchPromptState(){el("searchBox").classList.toggle("hasValue",Boolean(el("searchInput").value.trim()))}
+function resumeSearchPromptRotation(){
+ syncSearchPromptState();
+ if(el("searchInput").value.trim())pauseSearchPromptRotation();
+ else el("searchPromptTrack").classList.remove("paused");
+}
+function handleSearchInput(event){pauseSearchPromptRotation();syncSearchPromptState();renderCatalog();renderSearchSuggestions(event.target.value)}
+function handleSearchFocus(){pauseSearchPromptRotation();renderSearchSuggestions(el("searchInput").value)}
 function handleSearchKeydown(event){
  const suggestions=[...el("searchSuggestions").querySelectorAll(".suggestion")];
  if(event.key==="ArrowDown"||event.key==="ArrowUp"){
@@ -157,19 +203,29 @@ function renderSearchSuggestions(query=""){
   box.innerHTML='<div class="suggestionLabel">Popular categories</div>'+categories.slice(0,6).map(category=>`<button class="suggestion" role="option" aria-selected="false" onclick="selectSearchSuggestion('category','${category.value}')"><span class="suggestionInfo"><b>${category.label}</b><small>Browse ${category.label.toLowerCase()} products</small></span><span class="suggestionArrow">→</span></button>`).join("");
  }else{
   const matches=products.filter(product=>(product.name+" "+product.cat+" "+product.shop).toLowerCase().includes(normalized)).slice(0,5);
+  const serviceMatches=services.filter(service=>(service.name+" "+service.category+" "+service.description).toLowerCase().includes(normalized)).slice(0,4);
   const productRows=matches.length?'<div class="suggestionLabel">Products</div>'+matches.map(product=>`<button class="suggestion" role="option" aria-selected="false" onclick="selectSearchSuggestion('product',${product.id})"><img class="suggestionThumb" src="${product.image}" alt=""><span class="suggestionInfo"><b>${product.name}</b><small>${product.cat} · ${money(product.price)}</small></span><span class="suggestionArrow">→</span></button>`).join(""):"";
+  const serviceRows=serviceMatches.length?'<div class="suggestionLabel">Services</div>'+serviceMatches.map(service=>`<button class="suggestion" role="option" aria-selected="false" onclick="selectSearchSuggestion('service','${service.id}')"><img class="suggestionThumb" src="${img(service.image)}" alt=""><span class="suggestionInfo"><b>${service.name}</b><small>${service.category} · Quote on request</small></span><span class="suggestionArrow">→</span></button>`).join(""):"";
   const categoryRows=categoryMatches.length?'<div class="suggestionLabel">Categories</div>'+categoryMatches.slice(0,5).map(category=>`<button class="suggestion" role="option" aria-selected="false" onclick="selectSearchSuggestion('category','${category.value}')"><span class="suggestionInfo"><b>${category.label}</b><small>Browse this category</small></span><span class="suggestionArrow">→</span></button>`).join(""):"";
-  box.innerHTML=productRows+categoryRows||'<div class="suggestionLabel">No matching products yet</div>';
+  box.innerHTML=productRows+serviceRows+categoryRows||'<div class="suggestionLabel">No matching products or services yet</div>';
  }
  box.hidden=false;el("searchInput").setAttribute("aria-expanded","true");
 }
 function selectSearchSuggestion(type,value){
- if(type==="category"){el("searchCat").value=value;el("searchInput").value="";renderCatalog();el("catalog").scrollIntoView({behavior:"smooth"})}
+ if(type==="category"){el("searchCat").value=value;el("searchInput").value="";syncSearchPromptState();resumeSearchPromptRotation();renderCatalog();el("catalog").scrollIntoView({behavior:"smooth"})}
+ else if(type==="service"){const service=services.find(item=>item.id===value);el("searchInput").value="";syncSearchPromptState();resumeSearchPromptRotation();filterServiceCategory(service.category)}
  else openProduct(Number(value));
  closeSearchSuggestions();
 }
 function closeSearchSuggestions(){el("searchSuggestions").hidden=true;el("searchInput").setAttribute("aria-expanded","false");activeSearchSuggestion=-1}
-function submitSearch(){closeSearchSuggestions();renderCatalog();el("catalog").scrollIntoView({behavior:"smooth"})}
+function submitSearch(){
+ const query=el("searchInput").value.trim().toLowerCase();
+ const productMatch=products.some(product=>(product.name+" "+product.cat+" "+product.shop+" "+product.desc).toLowerCase().includes(query));
+ const serviceMatch=services.find(service=>(service.name+" "+service.category+" "+service.description).toLowerCase().includes(query));
+ closeSearchSuggestions();
+ if(query&&!productMatch&&serviceMatch){el("searchInput").value="";syncSearchPromptState();resumeSearchPromptRotation();filterServiceCategory(serviceMatch.category);return}
+ renderCatalog();el("catalog").scrollIntoView({behavior:"smooth"});
+}
 function toggleFilters(){el("filters").classList.toggle("open")}
 function recordRecentlyViewed(id){recentlyViewed=[id,...recentlyViewed.filter(item=>item!==id)].slice(0,12);localStorage.setItem("mbaleRecentlyViewed",JSON.stringify(recentlyViewed));renderRecommendations()}
 function renderPartners(){
@@ -189,9 +245,9 @@ function renderCatalog(){
  el("resultCount").textContent=`${arr.length} products`;el("catalogGrid").innerHTML=arr.length?arr.map(productCard).join(""):`<div class="empty"><div style="font-size:35px">🔎</div><h3>No matching products</h3><p>Try another search, category or price range.</p></div>`;
 }
 document.addEventListener("click",event=>{if(!event.target.closest(".search"))closeSearchSuggestions()});
-function filterCategory(cat){el("searchCat").value=cat;el("searchInput").value="";document.querySelectorAll(".filters input[type=checkbox]").forEach(input=>input.checked=false);document.getElementById("catalog").scrollIntoView({behavior:"smooth"});renderCatalog()}
-function filterDeals(){el("searchInput").value="";document.getElementById("catalog").scrollIntoView();el("sort").value="featured";renderCatalog()}
-function clearFilters(){document.querySelectorAll(".filters input[type=checkbox]").forEach(x=>x.checked=false);el("priceRange").value=2000000;el("sellerFilter").value="all";el("searchInput").value="";el("searchCat").value="all";renderCatalog()}
+function filterCategory(cat){el("searchCat").value=cat;el("searchInput").value="";syncSearchPromptState();resumeSearchPromptRotation();document.querySelectorAll(".filters input[type=checkbox]").forEach(input=>input.checked=false);document.getElementById("catalog").scrollIntoView({behavior:"smooth"});renderCatalog()}
+function filterDeals(){el("searchInput").value="";syncSearchPromptState();resumeSearchPromptRotation();document.getElementById("catalog").scrollIntoView();el("sort").value="featured";renderCatalog()}
+function clearFilters(){document.querySelectorAll(".filters input[type=checkbox]").forEach(x=>x.checked=false);el("priceRange").value=2000000;el("sellerFilter").value="all";el("searchInput").value="";el("searchCat").value="all";syncSearchPromptState();resumeSearchPromptRotation();renderCatalog()}
 function toggleWish(id){if(wish.includes(id)){wish=wish.filter(x=>x!==id);toast("Removed from wishlist")}else{wish.push(id);toast("Added to wishlist")}save();renderCatalog();renderDeals();renderRecommendations()}
 function openProduct(id){
  currentProduct=products.find(p=>p.id===id);recordRecentlyViewed(id);const p=currentProduct, os=offers[id]||[[p.shop,p.price]];
@@ -205,8 +261,8 @@ function showTab(t){
  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));event?.target?.classList.add("active");
 }
 function closeModal(){el("modalWrap").classList.remove("show")}
-function addToCart(id){const found=cart.find(x=>x.id===id);if(found)found.qty++;else cart.push({id,qty:1});save();renderRecommendations();toast("Added to cart");}
-function buyNow(id){addToCart(id);closeModal();toggleCart()}
+function addToCart(id){if(demoInventory[id-1]?.stock===0){toast("This item is out of stock");return}const found=cart.find(x=>x.id===id);if(found)found.qty++;else cart.push({id,qty:1});save();renderRecommendations();toast("Added to cart");}
+function buyNow(id){if(demoInventory[id-1]?.stock===0){toast("This item is out of stock");return}addToCart(id);closeModal();toggleCart()}
 function toggleCart(){el("cartDrawer").classList.toggle("show");renderCart()}
 function renderCart(){
  const box=el("cartItems");if(!cart.length){box.innerHTML='<div class="empty" style="margin-top:20px">Your cart is empty.<br><button class="primary" style="margin-top:12px" onclick="toggleCart();document.getElementById(\'catalog\').scrollIntoView()">Start shopping</button></div>';el("cartTotal").textContent="UGX 0";return}
@@ -228,4 +284,4 @@ function showAccount(){el("modal").innerHTML=`<button class="close" onclick="clo
 function showOrders(){el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>Your orders</h2><div class="empty">No orders yet.<br>Orders you place will appear here.</div></div>`;el("modalWrap").classList.add("show")}
 function showSell(){el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>Sell on Mbale Shopper</h2><p>List your shop and products so local customers can compare your offers.</p><div class="formGrid"><label>Business name<input placeholder="Shop name"></label><label>Contact phone<input placeholder="+256 ..."></label><label>Business category<select><option>Electronics</option><option>Fashion</option><option>Grocery</option><option>Home</option><option>Other</option></select></label><label>Location<input placeholder="Mbale area / landmark"></label><label class="full">Business description<textarea placeholder="Tell shoppers about your store"></textarea></label></div><button class="yellowBtn" style="margin-top:16px" onclick="toast('Seller application saved in demo');closeModal()">Submit seller application</button></div>`;el("modalWrap").classList.add("show")}
 function goHome(){window.scrollTo({top:0,behavior:"smooth"})}
-initCategories();renderCategories();renderDeals();renderRecommendations();renderServiceCategories();renderServices();renderPartners();initSellerFilter();renderCatalog();updateCartBadge();
+initCategories();initSearchPromptTrack();renderCategories();renderDeals();renderRecommendations();renderServiceCategories();renderServiceFilters();renderServices();renderPartners();initSellerFilter();renderCatalog();updateCartBadge();resumeSearchPromptRotation();
