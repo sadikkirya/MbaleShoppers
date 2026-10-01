@@ -1,4 +1,20 @@
 const img = (q) => `https://images.unsplash.com/${q}?auto=format&fit=crop&w=700&q=80`;
+const categories = [
+ {value:"Phones",label:"Phones",image:"photo-1511707171634-5f897ff02aa9"},
+ {value:"Electronics",label:"Electronics",image:"photo-1498049794561-7780e7231661"},
+ {value:"Computers & Gaming",label:"Computers & Gaming",image:"photo-1496181133206-80ce9b88a853"},
+ {value:"Fashion",label:"Fashion",image:"photo-1445205170230-053b83016050"},
+ {value:"Home",label:"Home & Kitchen",image:"photo-1556911220-bff31c812dba"},
+ {value:"Grocery",label:"Grocery",image:"photo-1542838132-92c53300491e"},
+ {value:"Beauty & Fragrance",label:"Beauty & Fragrance",image:"photo-1596462502278-27bfdc403348"},
+ {value:"Health & Pharmacy",label:"Health & Pharmacy",image:"photo-1576091160399-112ba8d25d1d"},
+ {value:"Baby & Toys",label:"Baby & Toys",image:"photo-1596461404969-9ae70f2830c1"},
+ {value:"Sports & Outdoors",label:"Sports & Outdoors",image:"photo-1461896836934-ffe607ba8211"},
+ {value:"Automotive",label:"Automotive",image:"photo-1492144534655-ae79c964c9d7"},
+ {value:"Books & Stationery",label:"Books & Stationery",image:"photo-1507842217343-583bb7270b66"},
+ {value:"Pet Supplies",label:"Pet Supplies",image:"photo-1548199973-03cce0bbc87b"},
+ {value:"Jewelry & Watches",label:"Jewelry & Watches",image:"photo-1523275335684-37898b6baf30"}
+];
 const products = [
 {id:1,name:"Samsung Galaxy A25 5G 128GB",cat:"Phones",shop:"Sms Phone And electronic center mbale",price:899000,old:1049000,rating:4.7,reviews:126,tag:"BEST SELLER",delivery:"Pickup / seller delivery",desc:"5G smartphone with vivid AMOLED display, reliable battery life and modern camera system.",image:img("photo-1511707171634-5f897ff02aa9")},
 {id:2,name:"iPhone 13 128GB",cat:"Phones",shop:"MY PHONES MBALE",price:1899000,old:2100000,rating:4.8,reviews:84,tag:"POPULAR",delivery:"Seller delivery",desc:"Premium Apple smartphone with strong camera performance and smooth everyday use.",image:img("photo-1592286927505-2fd0a2f6b5f0")},
@@ -12,14 +28,26 @@ const products = [
 {id:10,name:"Electric Blender 1.5L",cat:"Home",shop:"Bam Shopping Center",price:145000,old:170000,rating:4.3,reviews:26,tag:"VALUE",delivery:"Store pickup",desc:"Multi-purpose kitchen blender for smoothies, sauces and daily food prep.",image:img("photo-1570222094114-d054a817e56b")},
 {id:11,name:"Air Fryer 5L Digital",cat:"Home",shop:"Bam Shopping Center",price:285000,old:320000,rating:4.6,reviews:61,tag:"POPULAR",delivery:"Seller delivery",desc:"Digital air fryer with preset cooking programs and large family-friendly capacity.",image:img("photo-1648146299282-1a4b8d2a7e04")},
 {id:12,name:"Bluetooth Portable Speaker",cat:"Electronics",shop:"Mobile Hub Uganda",price:120000,old:145000,rating:4.4,reviews:118,tag:"TOP RATED",delivery:"Pickup available",desc:"Portable wireless speaker for music, travel and small gatherings.",image:img("photo-1608043152269-423dbba4e7e1")},
-{id:13,name:"Baby Clothing Set",cat:"Kids",shop:"Twinma’s Fashion store",price:55000,old:70000,rating:4.7,reviews:18,tag:"NEW",delivery:"Pickup / local delivery",desc:"Comfortable baby clothing set; available sizes and colours vary by stock.",image:img("photo-1519238263530-99bdd11df2ea")},
+{id:13,name:"Baby Clothing Set",cat:"Baby & Toys",shop:"Twinma’s Fashion store",price:55000,old:70000,rating:4.7,reviews:18,tag:"NEW",delivery:"Pickup / local delivery",desc:"Comfortable baby clothing set; available sizes and colours vary by stock.",image:img("photo-1519238263530-99bdd11df2ea")},
 {id:14,name:"Men's Running Sneakers",cat:"Fashion",shop:"Think Twice Second Hand Clothes.",price:90000,old:125000,rating:4.2,reviews:22,tag:"LOW PRICE",delivery:"Store pickup",desc:"Casual sports sneakers. Check size, condition and exact pair with seller.",image:img("photo-1542291026-7eec264c27ff")},
 {id:15,name:"USB-C Fast Charger 45W",cat:"Electronics",shop:"MY PHONES MBALE",price:68000,old:85000,rating:4.5,reviews:93,tag:"DEAL",delivery:"Pickup available",desc:"Fast USB-C wall charger for compatible smartphones, tablets and accessories.",image:img("photo-1609592424846-1d8d6e1a8a2a")},
 {id:16,name:"Microwave Oven 20L",cat:"Home",shop:"Bam Shopping Center",price:390000,old:450000,rating:4.3,reviews:17,tag:"SAVE",delivery:"Seller delivery",desc:"Compact microwave oven for everyday reheating and cooking.",image:img("photo-1585659722983-3a675dabf23d")},
 {id:17,name:"LED Ring Light 12-inch",cat:"Electronics",shop:"Sms Phone And electronic center mbale",price:75000,old:95000,rating:4.5,reviews:44,tag:"CREATOR PICK",delivery:"Pickup / seller delivery",desc:"Adjustable LED ring light for content creation, calls and product photos.",image:img("photo-1520857014576-2c4f4c972b57")},
 {id:18,name:"Women's Casual Dress",cat:"Fashion",shop:"Kim's fashion house",price:72000,old:95000,rating:4.5,reviews:27,tag:"TRENDING",delivery:"Local delivery",desc:"Easy everyday dress with a relaxed silhouette. Colours and sizes vary.",image:img("photo-1496747611176-843222e1e57c")},
 {id:19,name:"Laundry Detergent 2kg",cat:"Grocery",shop:"Masse Supermarket",price:18000,old:21500,rating:4.5,reviews:49,tag:"VALUE",delivery:"Store pickup",desc:"Household laundry detergent; confirm brand and pack size with seller.",image:img("photo-1583947215259-38e31be8751f")},
-{id:20,name:"Office Backpack",cat:"Fashion",shop:"Abrah Shopping Centre Mbale",price:78000,old:95000,rating:4.4,reviews:36,tag:"WORK ESSENTIAL",delivery:"Local delivery",desc:"Everyday backpack suitable for laptops, school and office use.",image:img("photo-1553062407-98eeb64c6a62")}
+{id:20,name:"Office Backpack",cat:"Fashion",shop:"Abrah Shopping Centre Mbale",price:78000,old:95000,rating:4.4,reviews:36,tag:"WORK ESSENTIAL",delivery:"Local delivery",desc:"Everyday backpack suitable for laptops, school and office use.",image:img("photo-1553062407-98eeb64c6a62")},
+{id:21,name:"IdeaPad Slim 3 Laptop",cat:"Computers & Gaming",shop:"P & T ELECTRONICS MBALE",price:1650000,old:1850000,rating:4.6,reviews:34,tag:"WORK PICK",delivery:"Seller delivery",desc:"Everyday laptop for study, office work and browsing. Confirm exact configuration and warranty with the seller.",image:img("photo-1496181133206-80ce9b88a853")},
+{id:22,name:"Wireless Gaming Controller",cat:"Computers & Gaming",shop:"VIVA ELECTRONICS",price:210000,old:245000,rating:4.5,reviews:28,tag:"GAMING",delivery:"Pickup available",desc:"Wireless game controller. Confirm device compatibility and included accessories with the seller.",image:img("photo-1593305841991-05c297ba4575")},
+{id:23,name:"Daily Face Cleanser 200ml",cat:"Beauty & Fragrance",shop:"Map Supermarket",price:32000,old:39000,rating:4.4,reviews:46,tag:"DAILY CARE",delivery:"Store pickup",desc:"Gentle daily facial cleanser. Check ingredients and suitability on the product packaging before use.",image:img("photo-1608248543803-ba4f8c70ae0b")},
+{id:24,name:"SPF 50 Sunscreen 100ml",cat:"Beauty & Fragrance",shop:"Republic Super Market",price:48000,old:56000,rating:4.5,reviews:52,tag:"SUN CARE",delivery:"Store pickup",desc:"Broad-spectrum sunscreen. Follow the label directions and check the expiry date before use.",image:img("photo-1556229010-6c3f2c9ca5f8")},
+{id:25,name:"Digital Thermometer",cat:"Health & Pharmacy",shop:"Bam Shopping Center",price:35000,old:42000,rating:4.5,reviews:41,tag:"HEALTH ESSENTIAL",delivery:"Store pickup",desc:"Digital thermometer for home temperature checks. Read the instructions and consult a qualified health professional for medical advice.",image:img("photo-1584308666744-24d5c474f2ae")},
+{id:26,name:"Home First Aid Kit",cat:"Health & Pharmacy",shop:"Republic Super Market",price:45000,old:52000,rating:4.6,reviews:37,tag:"HOME ESSENTIAL",delivery:"Store pickup",desc:"Compact first-aid kit for basic household preparedness. Contents can vary; check the pack and expiry dates.",image:img("photo-1603398938378-e54eab446dde")},
+{id:27,name:"Baby Diapers Value Pack",cat:"Baby & Toys",shop:"Map Supermarket",price:42000,old:49000,rating:4.6,reviews:63,tag:"FAMILY PICK",delivery:"Store pickup",desc:"Everyday baby diaper pack. Confirm size and quantity shown on the pack with the seller.",image:img("photo-1519689680058-324335c77eba")},
+{id:28,name:"Training Football",cat:"Sports & Outdoors",shop:"Bam Shopping Center",price:65000,old:78000,rating:4.4,reviews:24,tag:"SPORTS PICK",delivery:"Local delivery",desc:"Football for casual practice and recreation. Confirm size and construction with the seller.",image:img("photo-1574629810360-7efbbe195018")},
+{id:29,name:"Universal Car Phone Mount",cat:"Automotive",shop:"Sms Phone And electronic center mbale",price:35000,old:43000,rating:4.3,reviews:33,tag:"TRAVEL PICK",delivery:"Pickup available",desc:"Adjustable phone mount for vehicle dashboards and vents. Check fit and placement before driving.",image:img("photo-1492144534655-ae79c964c9d7")},
+{id:30,name:"A5 Notebook Set",cat:"Books & Stationery",shop:"Abrah Shopping Centre Mbale",price:18000,old:22000,rating:4.5,reviews:58,tag:"STUDY ESSENTIAL",delivery:"Store pickup",desc:"Set of lined notebooks for school, planning and everyday notes. Confirm page count with the seller.",image:img("photo-1531346878377-a5be20888e57")},
+{id:31,name:"Adult Dog Food 2kg",cat:"Pet Supplies",shop:"Map Supermarket",price:47000,old:55000,rating:4.2,reviews:19,tag:"PET CARE",delivery:"Store pickup",desc:"Packaged dog food. Check ingredients, feeding guidance and expiry date on the label.",image:img("photo-1589924691995-400dc9ecc119")},
+{id:32,name:"Classic Quartz Wristwatch",cat:"Jewelry & Watches",shop:"MY PHONES MBALE",price:95000,old:115000,rating:4.4,reviews:31,tag:"CLASSIC STYLE",delivery:"Pickup available",desc:"Quartz wristwatch with a versatile everyday design. Confirm colour, materials and warranty with the seller.",image:img("photo-1523275335684-37898b6baf30")}
 ];
 
 const shops = [
@@ -43,7 +71,7 @@ const offers = {
   11:[["Bam Shopping Center",285000],["Republic Super Market",299000]],
   12:[["Mobile Hub Uganda",120000],["P & T ELECTRONICS MBALE",125000],["VIVA ELECTRONICS",132000]]
 };
-let cart=JSON.parse(localStorage.getItem("mbaleCart")||"[]"), wish=JSON.parse(localStorage.getItem("mbaleWish")||"[]"), currentProduct=null;
+let cart=JSON.parse(localStorage.getItem("mbaleCart")||"[]"), wish=JSON.parse(localStorage.getItem("mbaleWish")||"[]"), recentlyViewed=JSON.parse(localStorage.getItem("mbaleRecentlyViewed")||"[]"), currentProduct=null, activeSearchSuggestion=-1;
 
 const money=n=>"UGX "+Number(n).toLocaleString("en-UG");
 const el=id=>document.getElementById(id);
@@ -54,13 +82,61 @@ function productCard(p){
  const liked=wish.includes(p.id);
  return `<article class="card" onclick="openProduct(${p.id})">
  <div class="productImg"><img loading="lazy" src="${p.image}" alt="${p.name}"><span class="tag">${p.tag}</span><button class="heart" onclick="event.stopPropagation();toggleWish(${p.id})">${liked?"♥":"♡"}</button></div>
- <div class="cardBody"><div class="rating">★ ${p.rating} <span style="color:#98a2b3">(${p.reviews})</span></div><div class="title">${p.name}</div><div class="seller">Sold by ${p.shop}</div><div class="price">${money(p.price)} <span class="old">${money(p.old)}</span></div><div class="save">Save ${money(p.old-p.price)}</div><div class="delivery">✓ ${p.delivery}</div>${offers[p.id]?`<div class="compare"><span>Compare</span><strong>${offers[p.id].length} offers</strong></div>`:""}</div></article>`;
+ <div class="cardBody"><div class="rating">★ ${p.rating} <span style="color:#98a2b3">(${p.reviews})</span></div><div class="title">${p.name}</div><div class="seller">Sold by ${p.shop}</div><div class="price">${money(p.price)} <span class="old">${money(p.old)}</span></div><div class="save">Save ${money(p.old-p.price)}</div><div class="delivery">✓ ${p.delivery}</div>${offers[p.id]?`<div class="compare"><span>Compare</span><strong>${offers[p.id].length} offers</strong></div>`:""}<button class="quickAdd" onclick="event.stopPropagation();addToCart(${p.id})">Add to cart</button></div></article>`;
 }
 function renderCategories(){
- const data=[["📱","Phones"],["💻","Electronics"],["👕","Fashion"],["🛒","Grocery"],["🏠","Home"],["💄","Beauty"],["🧸","Kids"],["🏋️","Sports"],["🚗","Automotive"],["📚","Books"]];
- el("categories").innerHTML=data.map(x=>`<button class="cat" onclick="filterCategory('${x[1]}')"><div class="catIcon">${x[0]}</div><span>${x[1]}</span></button>`).join("");
+ el("categories").innerHTML=categories.map(category=>`<button class="cat" onclick="filterCategory('${category.value}')"><img loading="lazy" src="${img(category.image)}" alt=""><span>${category.label}</span></button>`).join("");
 }
-function renderDeals(){el("dealGrid").innerHTML=products.slice(0,10).map(productCard).join("")}
+function initCategories(){
+ el("searchCat").innerHTML='<option value="all">All categories</option>'+categories.map(category=>`<option value="${category.value}">${category.label}</option>`).join("");
+ el("categoryFilters").innerHTML=categories.map(category=>`<label><input type="checkbox" value="${category.value}" onchange="renderCatalog()"> ${category.label}</label>`).join("");
+}
+function renderDeals(){el("dealGrid").innerHTML=products.filter(p=>p.old>p.price).sort((a,b)=>(b.old-b.price)/b.old-(a.old-a.price)/a.old).slice(0,10).map(productCard).join("")}
+function renderRecommendations(){
+ const signals=[...recentlyViewed.map(id=>[id,3]),...wish.map(id=>[id,2]),...cart.map(item=>[item.id,1])];
+ const categoryScores={};
+ signals.forEach(([id,weight])=>{const product=products.find(item=>item.id===id);if(product)categoryScores[product.cat]=(categoryScores[product.cat]||0)+weight});
+ const preferredCategory=Object.keys(categoryScores).sort((a,b)=>categoryScores[b]-categoryScores[a])[0];
+ let picks=preferredCategory?products.filter(product=>product.cat===preferredCategory&&!recentlyViewed.includes(product.id)):[];
+ if(!picks.length)picks=products.slice().sort((a,b)=>b.rating-a.rating);
+ el("recommendationReason").textContent=preferredCategory?`More ${preferredCategory.toLowerCase()} picks based on your activity`:"Popular with Mbale shoppers";
+ el("recommendationGrid").innerHTML=picks.slice(0,10).map(productCard).join("");
+}
+function scrollShelf(id,direction){const shelf=el(id),distance=id==="categories"?shelf.clientWidth*.8:510;shelf.scrollBy({left:direction*distance,behavior:"smooth"})}
+function handleSearchInput(event){renderCatalog();renderSearchSuggestions(event.target.value)}
+function handleSearchFocus(){renderSearchSuggestions(el("searchInput").value)}
+function handleSearchKeydown(event){
+ const suggestions=[...el("searchSuggestions").querySelectorAll(".suggestion")];
+ if(event.key==="ArrowDown"||event.key==="ArrowUp"){
+  if(!suggestions.length)return;
+  event.preventDefault();activeSearchSuggestion=(activeSearchSuggestion+(event.key==="ArrowDown"?1:-1)+suggestions.length)%suggestions.length;
+  suggestions.forEach((item,index)=>{item.classList.toggle("active",index===activeSearchSuggestion);item.setAttribute("aria-selected",String(index===activeSearchSuggestion))});
+ }else if(event.key==="Enter"){
+  event.preventDefault();if(activeSearchSuggestion>=0&&suggestions[activeSearchSuggestion])suggestions[activeSearchSuggestion].click();else submitSearch();
+ }else if(event.key==="Escape")closeSearchSuggestions();
+}
+function renderSearchSuggestions(query=""){
+ const box=el("searchSuggestions"),normalized=query.trim().toLowerCase();activeSearchSuggestion=-1;
+ const categoryMatches=categories.filter(category=>!normalized||category.label.toLowerCase().includes(normalized)||category.value.toLowerCase().includes(normalized));
+ if(!normalized){
+  box.innerHTML='<div class="suggestionLabel">Popular categories</div>'+categories.slice(0,6).map(category=>`<button class="suggestion" role="option" aria-selected="false" onclick="selectSearchSuggestion('category','${category.value}')"><span class="suggestionInfo"><b>${category.label}</b><small>Browse ${category.label.toLowerCase()} products</small></span><span class="suggestionArrow">→</span></button>`).join("");
+ }else{
+  const matches=products.filter(product=>(product.name+" "+product.cat+" "+product.shop).toLowerCase().includes(normalized)).slice(0,5);
+  const productRows=matches.length?'<div class="suggestionLabel">Products</div>'+matches.map(product=>`<button class="suggestion" role="option" aria-selected="false" onclick="selectSearchSuggestion('product',${product.id})"><img class="suggestionThumb" src="${product.image}" alt=""><span class="suggestionInfo"><b>${product.name}</b><small>${product.cat} · ${money(product.price)}</small></span><span class="suggestionArrow">→</span></button>`).join(""):"";
+  const categoryRows=categoryMatches.length?'<div class="suggestionLabel">Categories</div>'+categoryMatches.slice(0,5).map(category=>`<button class="suggestion" role="option" aria-selected="false" onclick="selectSearchSuggestion('category','${category.value}')"><span class="suggestionInfo"><b>${category.label}</b><small>Browse this category</small></span><span class="suggestionArrow">→</span></button>`).join(""):"";
+  box.innerHTML=productRows+categoryRows||'<div class="suggestionLabel">No matching products yet</div>';
+ }
+ box.hidden=false;el("searchInput").setAttribute("aria-expanded","true");
+}
+function selectSearchSuggestion(type,value){
+ if(type==="category"){el("searchCat").value=value;el("searchInput").value="";renderCatalog();el("catalog").scrollIntoView({behavior:"smooth"})}
+ else openProduct(Number(value));
+ closeSearchSuggestions();
+}
+function closeSearchSuggestions(){el("searchSuggestions").hidden=true;el("searchInput").setAttribute("aria-expanded","false");activeSearchSuggestion=-1}
+function submitSearch(){closeSearchSuggestions();renderCatalog();el("catalog").scrollIntoView({behavior:"smooth"})}
+function toggleFilters(){el("filters").classList.toggle("open")}
+function recordRecentlyViewed(id){recentlyViewed=[id,...recentlyViewed.filter(item=>item!==id)].slice(0,12);localStorage.setItem("mbaleRecentlyViewed",JSON.stringify(recentlyViewed));renderRecommendations()}
 function renderPartners(){
  const shopList=shops.map(shop=>`<div class="partnerItem"><span class="partnerLogo" aria-hidden="true">${shop.letter}</span><span class="partnerName">${shop.name}</span></div>`).join("");
  const deliveryPartners=["Seller delivery","Local delivery","Shop pickup"];
@@ -77,12 +153,13 @@ function renderCatalog(){
  el("rangeVal").textContent=max>=2000000?"2M+":money(max).replace("UGX ","");
  el("resultCount").textContent=`${arr.length} products`;el("catalogGrid").innerHTML=arr.length?arr.map(productCard).join(""):`<div class="empty"><div style="font-size:35px">🔎</div><h3>No matching products</h3><p>Try another search, category or price range.</p></div>`;
 }
-function filterCategory(cat){if(cat==="all"){el("searchCat").value="all"}else{el("searchCat").value=cat;el("searchInput").value=""}document.getElementById("catalog").scrollIntoView();renderCatalog()}
+document.addEventListener("click",event=>{if(!event.target.closest(".search"))closeSearchSuggestions()});
+function filterCategory(cat){el("searchCat").value=cat;el("searchInput").value="";document.querySelectorAll(".filters input[type=checkbox]").forEach(input=>input.checked=false);document.getElementById("catalog").scrollIntoView({behavior:"smooth"});renderCatalog()}
 function filterDeals(){el("searchInput").value="";document.getElementById("catalog").scrollIntoView();el("sort").value="featured";renderCatalog()}
 function clearFilters(){document.querySelectorAll(".filters input[type=checkbox]").forEach(x=>x.checked=false);el("priceRange").value=2000000;el("sellerFilter").value="all";el("searchInput").value="";el("searchCat").value="all";renderCatalog()}
-function toggleWish(id){if(wish.includes(id)){wish=wish.filter(x=>x!==id);toast("Removed from wishlist")}else{wish.push(id);toast("Added to wishlist")}save();renderCatalog();renderDeals()}
+function toggleWish(id){if(wish.includes(id)){wish=wish.filter(x=>x!==id);toast("Removed from wishlist")}else{wish.push(id);toast("Added to wishlist")}save();renderCatalog();renderDeals();renderRecommendations()}
 function openProduct(id){
- currentProduct=products.find(p=>p.id===id);const p=currentProduct, os=offers[id]||[[p.shop,p.price]];
+ currentProduct=products.find(p=>p.id===id);recordRecentlyViewed(id);const p=currentProduct, os=offers[id]||[[p.shop,p.price]];
  el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="productDetail"><div class="detailImg"><img src="${p.image}" alt="${p.name}"></div><div class="detailBody"><div class="rating">★ ${p.rating} • ${p.reviews} reviews</div><h2>${p.name}</h2><p style="color:#667085">${p.desc}</p><div class="bigPrice">${money(p.price)} <span class="old">${money(p.old)}</span></div><div class="detailMeta"><span class="pill">✓ Mbale seller</span><span class="pill">↻ Return policy shown below</span><span class="pill">⚡ Local pickup/delivery</span></div><h3>Compare seller offers</h3>${os.map((o,i)=>`<div class="offer ${i===0?"best":""}"><div><b>${o[0]}</b><small>${i===0?"Lowest listed offer":"Alternative seller offer"} • Terms may vary</small></div><strong>${money(o[1])}</strong></div>`).join("")}<div style="display:flex;gap:9px;margin-top:16px"><button class="yellowBtn" onclick="addToCart(${p.id})">Add to cart</button><button class="primary" onclick="buyNow(${p.id})">Buy now</button></div><div class="tabs"><span class="tab active" onclick="showTab('details')">Details</span><span class="tab" onclick="showTab('seller')">Seller</span><span class="tab" onclick="showTab('returns')">Returns</span><span class="tab" onclick="showTab('terms')">Terms</span></div><div id="tabPane" class="tabPane"><b>Product details</b><br>${p.desc}<br><br><b>Availability:</b> Seller stock must be confirmed before checkout.</div></div></div>`;
  el("modalWrap").classList.add("show");
 }
@@ -93,7 +170,7 @@ function showTab(t){
  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));event?.target?.classList.add("active");
 }
 function closeModal(){el("modalWrap").classList.remove("show")}
-function addToCart(id){const found=cart.find(x=>x.id===id);if(found)found.qty++;else cart.push({id,qty:1});save();toast("Added to cart");}
+function addToCart(id){const found=cart.find(x=>x.id===id);if(found)found.qty++;else cart.push({id,qty:1});save();renderRecommendations();toast("Added to cart");}
 function buyNow(id){addToCart(id);closeModal();toggleCart()}
 function toggleCart(){el("cartDrawer").classList.toggle("show");renderCart()}
 function renderCart(){
@@ -116,4 +193,4 @@ function showAccount(){el("modal").innerHTML=`<button class="close" onclick="clo
 function showOrders(){el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>Your orders</h2><div class="empty">No orders yet.<br>Orders you place will appear here.</div></div>`;el("modalWrap").classList.add("show")}
 function showSell(){el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>Sell on Mbale Shopper</h2><p>List your shop and products so local customers can compare your offers.</p><div class="formGrid"><label>Business name<input placeholder="Shop name"></label><label>Contact phone<input placeholder="+256 ..."></label><label>Business category<select><option>Electronics</option><option>Fashion</option><option>Grocery</option><option>Home</option><option>Other</option></select></label><label>Location<input placeholder="Mbale area / landmark"></label><label class="full">Business description<textarea placeholder="Tell shoppers about your store"></textarea></label></div><button class="yellowBtn" style="margin-top:16px" onclick="toast('Seller application saved in demo');closeModal()">Submit seller application</button></div>`;el("modalWrap").classList.add("show")}
 function goHome(){window.scrollTo({top:0,behavior:"smooth"})}
-renderCategories();renderDeals();renderPartners();initSellerFilter();renderCatalog();updateCartBadge();
+initCategories();renderCategories();renderDeals();renderRecommendations();renderPartners();initSellerFilter();renderCatalog();updateCartBadge();

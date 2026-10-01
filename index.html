@@ -13,10 +13,11 @@
 <header class="header">
   <div class="headrow">
     <a class="logo" href="#" onclick="goHome()"><span class="logoMark">M</span>Mbale Shopper</a>
-    <div class="search">
-      <select id="searchCat"><option value="all">All categories</option><option>Electronics</option><option>Phones</option><option>Fashion</option><option>Grocery</option><option>Home</option><option>Beauty</option><option>Kids</option></select>
-      <input id="searchInput" placeholder="Search products and brands in Mbale..." oninput="renderCatalog()">
-      <button onclick="renderCatalog()">⌕</button>
+    <div class="search" onclick="event.stopPropagation()">
+      <select id="searchCat" aria-label="Search category"><option value="all">All categories</option></select>
+      <input id="searchInput" role="combobox" aria-autocomplete="list" aria-controls="searchSuggestions" aria-expanded="false" placeholder="Search products and brands in Mbale..." oninput="handleSearchInput(event)" onfocus="handleSearchFocus()" onkeydown="handleSearchKeydown(event)">
+      <button aria-label="Search products" onclick="submitSearch()">⌕</button>
+      <div class="searchSuggestions" id="searchSuggestions" role="listbox" hidden></div>
     </div>
     <div class="headActions">
       <button class="action hideMob" onclick="showAccount()">👤 <span>Account</span></button>
@@ -26,44 +27,51 @@
   </div>
 </header>
 <nav class="nav">
-  <a href="#" onclick="goHome()">Home</a><a href="#catalog">Shop All</a><a href="#deals">Today's Deals</a><a href="#" onclick="filterCategory('Electronics')">Electronics</a><a href="#" onclick="filterCategory('Phones')">Phones</a><a href="#" onclick="filterCategory('Fashion')">Fashion</a><a href="#" onclick="filterCategory('Grocery')">Grocery</a><a href="#" onclick="filterCategory('Home')">Home & Kitchen</a><a href="#" onclick="showSell()">Sell on Mbale Shopper</a>
+  <a href="#" onclick="goHome()">Home</a><a href="#catalog">Shop All</a><a href="#deals">Today's Deals</a><a href="#" onclick="filterCategory('Phones')">Phones</a><a href="#" onclick="filterCategory('Electronics')">Electronics</a><a href="#" onclick="filterCategory('Fashion')">Fashion</a><a href="#" onclick="filterCategory('Grocery')">Grocery</a><a href="#" onclick="filterCategory('Health & Pharmacy')">Health & Pharmacy</a><a href="#" onclick="showSell()">Sell on Mbale Shopper</a>
 </nav>
 
 <main class="container">
 <section class="hero">
   <div class="heroMain">
-    <h1>Compare Mbale prices. Shop with confidence.</h1>
-    <p>Discover everyday finds, compare prices across Mbale sellers and choose the product and delivery option that works for you.</p>
-    <button class="cta" onclick="document.getElementById('catalog').scrollIntoView()">Shop products →</button>
+    <div class="heroCopy"><span class="eyebrow">LOCAL FINDS, SMARTER CHOICES</span>
+    <h1>Good finds start right here in Mbale.</h1>
+    <p>Compare local prices, spot the right deal and find everyday essentials in one place.</p>
+    <button class="cta" onclick="document.getElementById('catalog').scrollIntoView({behavior:'smooth'})">Explore products <span aria-hidden="true">→</span></button></div>
+    <img class="heroImage" src="https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=900&q=85" alt="Smartphone featured in this week's local picks">
   </div>
   <div class="heroSide">
-    <div class="promo"><h3>🔎 Price comparison</h3><p>See offers from different Mbale sellers on the same product before you buy.</p></div>
-    <div class="promo dark"><h3>🚚 Flexible delivery</h3><p>Pickup and delivery options are shown with every product.</p></div>
+    <button class="promo promoLink" onclick="filterCategory('Electronics')"><span class="promoIcon">⌕</span><span><b>Compare before you choose</b><small>See local offers on one product.</small></span><span aria-hidden="true">→</span></button>
+    <button class="promo promoLink dark" onclick="filterCategory('Grocery')"><span class="promoIcon">＋</span><span><b>Everyday essentials</b><small>Browse useful picks for home.</small></span><span aria-hidden="true">→</span></button>
   </div>
 </section>
 
 <section class="section">
-<div class="sectionHead"><h2>Shop by category</h2><button onclick="filterCategory('all')">View all</button></div>
+<div class="sectionHead"><h2>Shop by category</h2><div class="shelfControls"><button class="shelfArrow" aria-label="Scroll categories left" onclick="scrollShelf('categories',-1)">←</button><button class="shelfArrow" aria-label="Scroll categories right" onclick="scrollShelf('categories',1)">→</button><button onclick="filterCategory('all')">View all</button></div></div>
 <div class="catgrid" id="categories"></div>
 </section>
 
 <section class="section" id="deals">
-<div class="sectionHead"><h2>Deals & popular picks</h2><button onclick="filterDeals()">View all</button></div>
-<div class="deals" id="dealGrid"></div>
+<div class="sectionHead"><div><span class="eyebrow sectionEyebrow">GOOD VALUE, FOUND LOCALLY</span><h2>Today's standout deals</h2></div><div class="shelfControls"><button class="shelfArrow" aria-label="Scroll deals left" onclick="scrollShelf('dealGrid',-1)">←</button><button class="shelfArrow" aria-label="Scroll deals right" onclick="scrollShelf('dealGrid',1)">→</button><button onclick="filterDeals()">View all</button></div></div>
+<div class="productRail" id="dealGrid"></div>
+</section>
+
+<section class="section recommendationSection">
+<div class="sectionHead"><div><span class="eyebrow sectionEyebrow">TUNED TO YOUR BROWSING</span><h2>Picked for you</h2><p id="recommendationReason">Popular with Mbale shoppers</p></div><div class="shelfControls"><button class="shelfArrow" aria-label="Scroll recommendations left" onclick="scrollShelf('recommendationGrid',-1)">←</button><button class="shelfArrow" aria-label="Scroll recommendations right" onclick="scrollShelf('recommendationGrid',1)">→</button></div></div>
+<div class="productRail" id="recommendationGrid"></div>
 </section>
 
 <section class="section" id="catalog">
 <div class="sectionHead"><h2>Explore products</h2><span id="resultCount" style="font-size:12px;color:#667085"></span></div>
 <div class="contentGrid">
-  <aside class="filters">
+  <aside class="filters" id="filters">
     <h3>Filters</h3>
-    <div class="filterGroup"><b style="font-size:12px">Category</b><label><input type="checkbox" value="Electronics" onchange="renderCatalog()"> Electronics</label><label><input type="checkbox" value="Phones" onchange="renderCatalog()"> Phones</label><label><input type="checkbox" value="Fashion" onchange="renderCatalog()"> Fashion</label><label><input type="checkbox" value="Grocery" onchange="renderCatalog()"> Grocery</label><label><input type="checkbox" value="Home" onchange="renderCatalog()"> Home</label></div>
+    <div class="filterGroup"><b style="font-size:12px">Category</b><div id="categoryFilters"></div></div>
     <div class="filterGroup"><b style="font-size:12px">Price</b><input type="range" id="priceRange" min="1000" max="2000000" step="1000" value="2000000" oninput="renderCatalog()"><div style="display:flex;justify-content:space-between;font-size:11px"><span>UGX 1k</span><span id="rangeVal">2M+</span></div></div>
     <div class="filterGroup"><b style="font-size:12px">Seller</b><select id="sellerFilter" onchange="renderCatalog()" style="width:100%;margin-top:7px;padding:8px;border:1px solid var(--line);border-radius:7px"><option value="all">All shops</option></select></div>
     <button class="primary" style="width:100%;margin-top:10px" onclick="clearFilters()">Clear filters</button>
   </aside>
   <div>
-    <div class="catalogTop"><b id="catalogTitle">All products</b><select id="sort" onchange="renderCatalog()"><option value="featured">Featured</option><option value="priceLow">Price: Low to high</option><option value="priceHigh">Price: High to low</option><option value="rating">Top rated</option></select></div>
+    <div class="catalogTop"><b id="catalogTitle">All products</b><div class="catalogTools"><button class="filterToggle" onclick="toggleFilters()">☷ Filters</button><select id="sort" onchange="renderCatalog()"><option value="featured">Featured</option><option value="priceLow">Price: Low to high</option><option value="priceHigh">Price: High to low</option><option value="rating">Top rated</option></select></div></div>
     <div class="grid" id="catalogGrid"></div>
   </div>
 </div>
