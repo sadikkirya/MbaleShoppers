@@ -174,6 +174,44 @@ function initCategories(){
  el("searchCat").innerHTML='<option value="all">All categories</option>'+categories.map(category=>`<option value="${category.value}">${category.label}</option>`).join("");
  el("categoryFilters").innerHTML=categories.map(category=>`<label><input type="checkbox" value="${category.value}" onchange="renderCatalog()"> ${category.label}</label>`).join("");
 }
+let megaMenuCloseTimer=null;
+const brandLogos={
+ Samsung:"https://cdn.jsdelivr.net/npm/simple-icons@v13/icons/samsung.svg",
+ Apple:"https://cdn.jsdelivr.net/npm/simple-icons@v13/icons/apple.svg",
+ Lenovo:"https://cdn.jsdelivr.net/npm/simple-icons@v13/icons/lenovo.svg",
+ Logitech:"https://cdn.jsdelivr.net/npm/simple-icons@v13/icons/logitech.svg",
+ Nike:"https://cdn.jsdelivr.net/npm/simple-icons@v13/icons/nike.svg",
+ Adidas:"https://cdn.jsdelivr.net/npm/simple-icons@v13/icons/adidas.svg",
+ Sony:"https://cdn.jsdelivr.net/npm/simple-icons@v13/icons/sony.svg",
+ LG:"https://cdn.jsdelivr.net/npm/simple-icons@v13/icons/lg.svg",
+ Dell:"https://cdn.jsdelivr.net/npm/simple-icons@v13/icons/dell.svg",
+ HP:"https://cdn.jsdelivr.net/npm/simple-icons@v13/icons/hp.svg",
+ Toyota:"https://cdn.jsdelivr.net/npm/simple-icons@v13/icons/toyota.svg"
+};
+const categoryBrandSets={
+ "Computers & Gaming":["Lenovo","Dell","HP","Logitech"],
+ Electronics:["Sony","LG","Logitech"],
+ Fashion:["Nike","Adidas"],
+ "Sports & Outdoors":["Nike","Adidas"],
+ Automotive:["Toyota"],
+ Home:["LG"]
+};
+function productBrand(product){
+ const known=["Samsung","Apple","Oraimo","Lenovo"];
+ return known.find(brand=>product.name.toLowerCase().includes(brand.toLowerCase()))||null;
+}
+function renderCategoryMegaMenu(category){
+ const menu=el("categoryMegaMenu"),items=products.filter(product=>product.cat===category),brands=[...new Set([...items.map(productBrand).filter(Boolean),...(categoryBrandSets[category]||[])])].filter(brand=>brandLogos[brand]).slice(0,6);
+ const brandMarkup=brands.length?`<div class="megaBrands" aria-label="Product brands">${brands.map(brand=>`<span class="megaBrand" title="${brand}" aria-label="${brand}"><span class="megaBrandIcon"><img src="${brandLogos[brand]}" alt="${brand} logo"></span></span>`).join("")}</div>`:"";
+ menu.innerHTML=`<div class="megaInner"><div class="megaHeader"><h3>${category}</h3><small>${items.length} products available</small></div><div class="megaProducts">${items.slice(0,6).map(product=>`<button class="megaProduct" onclick="openProduct(${product.id})"><img loading="lazy" src="${product.image}" alt=""><span class="megaProductInfo"><b>${product.name}</b><small>${money(product.price)}</small></span></button>`).join("")}</div>${brandMarkup}</div>`;
+ menu.classList.add("show");menu.setAttribute("aria-hidden","false");
+}
+function scheduleMegaMenuClose(){clearTimeout(megaMenuCloseTimer);megaMenuCloseTimer=setTimeout(()=>{const menu=el("categoryMegaMenu");menu.classList.remove("show");menu.setAttribute("aria-hidden","true")},180)}
+function initCategoryMegaMenu(){
+ const menu=el("categoryMegaMenu");
+ document.querySelectorAll(".categoryNavLink").forEach(link=>{link.addEventListener("mouseenter",()=>{clearTimeout(megaMenuCloseTimer);renderCategoryMegaMenu(link.dataset.category)});link.addEventListener("mouseleave",scheduleMegaMenuClose)});
+ menu.addEventListener("mouseenter",()=>clearTimeout(megaMenuCloseTimer));menu.addEventListener("mouseleave",scheduleMegaMenuClose);
+}
 function renderDeals(){el("dealGrid").innerHTML=products.filter(p=>p.old>p.price).sort((a,b)=>(b.old-b.price)/b.old-(a.old-a.price)/a.old).slice(0,10).map(productCard).join("")}
 function renderRecommendations(){
  const signals=[...recentlyViewed.map(id=>[id,3]),...wish.map(id=>[id,2]),...cart.map(item=>[item.id,1])];
@@ -338,4 +376,4 @@ function showAccount(){el("modal").innerHTML=`<button class="close" onclick="clo
 function showOrders(){el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>Your orders</h2><div class="empty">No orders yet.<br>Orders you place will appear here.</div></div>`;el("modalWrap").classList.add("show")}
 function showSell(){el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>Sell on Mbale Shopper</h2><p>List your shop and products so local customers can compare your offers.</p><div class="formGrid"><label>Business name<input placeholder="Shop name"></label><label>Contact phone<input placeholder="+256 ..."></label><label>Business category<select><option>Electronics</option><option>Fashion</option><option>Grocery</option><option>Home</option><option>Other</option></select></label><label>Location<input placeholder="Mbale area / landmark"></label><label class="full">Business description<textarea placeholder="Tell shoppers about your store"></textarea></label></div><button class="yellowBtn" style="margin-top:16px" onclick="toast('Seller application saved in demo');closeModal()">Submit seller application</button></div>`;el("modalWrap").classList.add("show")}
 function goHome(){window.scrollTo({top:0,behavior:"smooth"})}
-initCategories();initSearchPromptTrack();renderHeroPromos();renderCategories();renderDeals();renderRecommendations();renderSpotlight("eventSpotlight","UPCOMING EVENTS",eventSpotlightItems,"event");renderSpotlight("influencerSpotlight","TOP CITY INFLUENCERS",influencerSpotlightItems,"influencer");renderServiceCategories();renderServiceFilters();renderServices();renderPartners();initSellerFilter();renderCatalog();updateCartBadge();resumeSearchPromptRotation();
+initCategories();initSearchPromptTrack();initCategoryMegaMenu();renderHeroPromos();renderCategories();renderDeals();renderRecommendations();renderSpotlight("eventSpotlight","UPCOMING EVENTS",eventSpotlightItems,"event");renderSpotlight("influencerSpotlight","TOP CITY INFLUENCERS",influencerSpotlightItems,"influencer");renderServiceCategories();renderServiceFilters();renderServices();renderPartners();initSellerFilter();renderCatalog();updateCartBadge();resumeSearchPromptRotation();
