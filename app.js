@@ -172,7 +172,7 @@ function renderCategories(){
 }
 function initCategories(){
  el("searchCat").innerHTML='<option value="all">All categories</option>'+categories.map(category=>`<option value="${category.value}">${category.label}</option>`).join("");
- el("categoryFilters").innerHTML=categories.map(category=>`<label><input type="checkbox" value="${category.value}" onchange="renderCatalog()"> ${category.label}</label>`).join("");
+ renderCatalogFilters();
 }
 let megaMenuCloseTimer=null;
 const brandLogos={
@@ -197,18 +197,82 @@ const categoryBrandSets={
  Home:["LG"]
 };
 function productBrand(product){
- const known=["Samsung","Apple","Oraimo","Lenovo"];
- return known.find(brand=>product.name.toLowerCase().includes(brand.toLowerCase()))||null;
+ const name=product.name.toLowerCase();
+ if(name.includes("samsung"))return "Samsung";
+ if(name.includes("apple")||name.includes("iphone")||name.includes("ipad")||name.includes("macbook"))return "Apple";
+ if(name.includes("oraimo"))return "Oraimo";
+ if(name.includes("lenovo"))return "Lenovo";
+ return null;
+}
+function productFilterGroup(product){
+ const brand=productBrand(product);
+ return brand?{key:`${product.cat}|brand:${brand}`,label:brand}:{key:`${product.cat}|shop:${product.shop}`,label:product.shop};
+}
+function renderCatalogFilters(){
+ el("categoryFilters").innerHTML=categories.map(category=>{
+  const categoryProducts=products.filter(product=>product.cat===category.value);
+  if(!categoryProducts.length)return "";
+  const groups=new Map();
+  categoryProducts.forEach(product=>{
+   const group=productFilterGroup(product);
+   if(!groups.has(group.key))groups.set(group.key,{...group,products:[]});
+   groups.get(group.key).products.push(product);
+  });
+  const brandMarkup=[...groups.values()].map(group=>`<details class="filterTreeBrand"><summary><span>${group.label}</span><span class="filterCount">${group.products.length}</span></summary><div class="filterTreeProducts"><label class="filterTreeOption"><input class="brandFilter" type="checkbox" value="${group.key}" onchange="renderCatalog()"><span>All ${group.label}</span></label>${group.products.map(product=>`<button class="filterProductTitle" type="button" onclick="openProduct(${product.id})">${product.name}</button>`).join("")}</div></details>`).join("");
+  return `<details class="filterTreeCategory"><summary><span>${category.label}</span><span class="filterCount">${categoryProducts.length}</span></summary><div class="filterTreeBody"><label class="filterTreeOption"><input class="categoryFilter" type="checkbox" value="${category.value}" onchange="renderCatalog()"><span>All ${category.label}</span></label>${brandMarkup}</div></details>`;
+ }).join("");
+}
+function electronicsAccessoryGroup(product){
+ const name=product.name.toLowerCase();
+ if(/\biphone\b/.test(name))return "iPhones";
+ if(/\bsamsung\b/.test(name))return "Samsung";
+ if(/\bpower bank\b/.test(name))return "Power banks";
+ if(/\b(?:earbuds?|headphones?|earphones?)\b/.test(name))return "Earbuds";
+ if(/\bspeakers?\b/.test(name))return "Speakers";
+ if(/\b(?:tv|television)\b/.test(name))return "TVs";
+ if(/\bchargers?\b/.test(name))return "Chargers";
+ if(/\bring light\b/.test(name))return "Lighting";
+ if(/\bphone mount\b/.test(name))return "Phone accessories";
+ return "Other accessories";
+}
+function renderMenuProductGroup(label,items){
+ const productIds=items.map(product=>product.id).join(",");
+ return `<button class="megaProductGroupTitle" onclick="filterProductGroup('${productIds}')">${label}</button>`;
+}
+function renderMegaCategory(label,items,content){
+ const productIds=items.map(product=>product.id).join(",");
+ return `<section class="megaCategory"><button class="megaCategoryTitle" onclick="filterProductGroup('${productIds}')">${label}</button><div class="megaCategoryGroups">${content}</div></section>`;
+}
+function renderElectronicsMegaMenu(menu){
+ const phoneAccessoryProducts=products.filter(product=>["Phones","Electronics"].includes(product.cat)||/\bphone mount\b/i.test(product.name));
+ const computerProducts=products.filter(product=>product.cat==="Computers & Gaming"&&/(laptop|computer|notebook|desktop)/i.test(product.name));
+ const gamingProducts=products.filter(product=>product.cat==="Computers & Gaming"&&/(gaming|game|controller|console)/i.test(product.name));
+ const accessoryGroups=new Map();
+ phoneAccessoryProducts.forEach(product=>{
+  const label=electronicsAccessoryGroup(product);
+  if(!accessoryGroups.has(label))accessoryGroups.set(label,[]);
+  accessoryGroups.get(label).push(product);
+ });
+ const preferredOrder=["iPhones","Samsung","Power banks","Earbuds","Speakers","TVs","Chargers","Lighting","Phone accessories","Other accessories"];
+ const accessoryMarkup=[...accessoryGroups.entries()].sort((a,b)=>preferredOrder.indexOf(a[0])-preferredOrder.indexOf(b[0])).map(([label,items])=>renderMenuProductGroup(label,items)).join("");
+ const sections=[
+  renderMegaCategory("Phones and accessories",phoneAccessoryProducts,accessoryMarkup),
+  renderMegaCategory("Computers",computerProducts,""),
+  renderMegaCategory("Gaming",gamingProducts,"")
+ ];
+ const total=phoneAccessoryProducts.length+computerProducts.length+gamingProducts.length;
+ menu.innerHTML=`<div class="megaInner"><div class="megaHeader"><h3>Electronics</h3><small>${total} products available</small></div><div class="megaCategories">${sections.join("")}</div></div>`;
 }
 function renderCategoryMegaMenu(category){
  const menu=el("categoryMegaMenu"),items=products.filter(product=>product.cat===category),brands=[...new Set([...items.map(productBrand).filter(Boolean),...(categoryBrandSets[category]||[])])].filter(brand=>brandLogos[brand]).slice(0,6);
- const brandMarkup=brands.length?`<div class="megaBrands" aria-label="Product brands">${brands.map(brand=>`<span class="megaBrand" title="${brand}" aria-label="${brand}"><span class="megaBrandIcon"><img src="${brandLogos[brand]}" alt="${brand} logo"></span></span>`).join("")}</div>`:"";
- menu.innerHTML=`<div class="megaInner"><div class="megaHeader"><h3>${category}</h3><small>${items.length} products available</small></div><div class="megaProducts">${items.slice(0,6).map(product=>`<button class="megaProduct" onclick="openProduct(${product.id})"><img loading="lazy" src="${product.image}" alt=""><span class="megaProductInfo"><b>${product.name}</b><small>${money(product.price)}</small></span></button>`).join("")}</div>${brandMarkup}</div>`;
+ if(category==="Electronics")renderElectronicsMegaMenu(menu);
+ else menu.innerHTML=`<div class="megaInner"><div class="megaHeader"><h3>${category}</h3><small>${items.length} products available</small></div><div class="megaProducts">${items.slice(0,6).map(product=>`<button class="megaProduct" onclick="openProduct(${product.id})"><img loading="lazy" src="${product.image}" alt=""><span class="megaProductInfo"><b>${product.name}</b><small>${money(product.price)}</small></span></button>`).join("")}</div>${brands.length?`<div class="megaBrands" aria-label="Product brands">${brands.map(brand=>`<span class="megaBrand" title="${brand}" aria-label="${brand}"><span class="megaBrandIcon"><img src="${brandLogos[brand]}" alt="${brand} logo"></span></span>`).join("")}</div>`:""}</div>`;
  menu.classList.add("show");menu.setAttribute("aria-hidden","false");
 }
 function scheduleMegaMenuClose(){clearTimeout(megaMenuCloseTimer);megaMenuCloseTimer=setTimeout(()=>{const menu=el("categoryMegaMenu");menu.classList.remove("show");menu.setAttribute("aria-hidden","true")},180)}
 function initCategoryMegaMenu(){
  const menu=el("categoryMegaMenu");
+ document.querySelectorAll('.categoryNavLink[data-category="Phones"], .categoryNavLink[data-category="Computers & Gaming"]').forEach(link=>link.remove());
  document.querySelectorAll(".categoryNavLink").forEach(link=>{link.addEventListener("mouseenter",()=>{clearTimeout(megaMenuCloseTimer);renderCategoryMegaMenu(link.dataset.category)});link.addEventListener("mouseleave",scheduleMegaMenuClose)});
  menu.addEventListener("mouseenter",()=>clearTimeout(megaMenuCloseTimer));menu.addEventListener("mouseleave",scheduleMegaMenuClose);
 }
@@ -328,18 +392,33 @@ function renderPartners(){
  el("deliveryPartnerList").innerHTML=deliveryList;
 }
 function initSellerFilter(){el("sellerFilter").innerHTML='<option value="all">All shops</option>'+shops.map(s=>`<option>${s.name}</option>`).join("")}
+let activeCatalogProductIds=null;
 function renderCatalog(){
  const q=el("searchInput").value.toLowerCase(), cat=el("searchCat").value, max=Number(el("priceRange").value), seller=el("sellerFilter").value;
- const checked=[...document.querySelectorAll(".filters input[type=checkbox]:checked")].map(x=>x.value);
- let arr=products.filter(p=>(!q||(p.name+" "+p.shop+" "+p.cat+" "+p.desc).toLowerCase().includes(q))&&(cat==="all"||p.cat===cat)&&(!checked.length||checked.includes(p.cat))&&p.price<=max&&(seller==="all"||p.shop===seller));
+ const checkedCategories=[...document.querySelectorAll(".categoryFilter:checked")].map(input=>input.value);
+ const checkedBrands=[...document.querySelectorAll(".brandFilter:checked")].map(input=>input.value);
+ let arr=products.filter(p=>(!activeCatalogProductIds||activeCatalogProductIds.has(p.id))&&(!q||(p.name+" "+p.shop+" "+p.cat+" "+p.desc).toLowerCase().includes(q))&&(cat==="all"||p.cat===cat)&&(!checkedCategories.length||checkedCategories.includes(p.cat))&&(!checkedBrands.length||checkedBrands.includes(productFilterGroup(p).key))&&p.price<=max&&(seller==="all"||p.shop===seller));
  const sort=el("sort").value;if(sort==="priceLow")arr.sort((a,b)=>a.price-b.price);if(sort==="priceHigh")arr.sort((a,b)=>b.price-a.price);if(sort==="rating")arr.sort((a,b)=>b.rating-a.rating);
  el("rangeVal").textContent=max>=2000000?"2M+":money(max).replace("UGX ","");
  el("resultCount").textContent=`${arr.length} products`;el("catalogGrid").innerHTML=arr.length?arr.map(productCard).join(""):`<div class="empty"><div style="font-size:35px">🔎</div><h3>No matching products</h3><p>Try another search, category or price range.</p></div>`;
 }
 document.addEventListener("click",event=>{if(!event.target.closest(".search"))closeSearchSuggestions()});
-function filterCategory(cat){el("searchCat").value=cat;el("searchInput").value="";syncSearchPromptState();resumeSearchPromptRotation();document.querySelectorAll(".filters input[type=checkbox]").forEach(input=>input.checked=false);document.getElementById("catalog").scrollIntoView({behavior:"smooth"});renderCatalog()}
+function filterCategory(cat){activeCatalogProductIds=null;el("searchCat").value=cat;el("searchInput").value="";syncSearchPromptState();resumeSearchPromptRotation();document.querySelectorAll(".filters input[type=checkbox]").forEach(input=>input.checked=false);document.getElementById("catalog").scrollIntoView({behavior:"smooth"});renderCatalog()}
+function filterCategoryGroup(categoryValues){
+ activeCatalogProductIds=null;
+ const selected=categoryValues.split("|");
+ el("searchCat").value="all";el("searchInput").value="";syncSearchPromptState();resumeSearchPromptRotation();
+ document.querySelectorAll(".filters input[type=checkbox]").forEach(input=>{input.checked=input.classList.contains("categoryFilter")&&selected.includes(input.value)});
+ document.getElementById("catalog").scrollIntoView({behavior:"smooth"});renderCatalog();
+}
+function filterProductGroup(productIds){
+ activeCatalogProductIds=new Set(productIds.split(",").map(Number));
+ el("searchCat").value="all";el("searchInput").value="";el("priceRange").value=2000000;el("sellerFilter").value="all";syncSearchPromptState();resumeSearchPromptRotation();
+ document.querySelectorAll(".filters input[type=checkbox]").forEach(input=>input.checked=false);
+ document.getElementById("catalog").scrollIntoView({behavior:"smooth"});renderCatalog();
+}
 function filterDeals(){el("searchInput").value="";syncSearchPromptState();resumeSearchPromptRotation();document.getElementById("catalog").scrollIntoView();el("sort").value="featured";renderCatalog()}
-function clearFilters(){document.querySelectorAll(".filters input[type=checkbox]").forEach(x=>x.checked=false);el("priceRange").value=2000000;el("sellerFilter").value="all";el("searchInput").value="";el("searchCat").value="all";syncSearchPromptState();resumeSearchPromptRotation();renderCatalog()}
+function clearFilters(){activeCatalogProductIds=null;document.querySelectorAll(".filters input[type=checkbox]").forEach(x=>x.checked=false);el("priceRange").value=2000000;el("sellerFilter").value="all";el("searchInput").value="";el("searchCat").value="all";syncSearchPromptState();resumeSearchPromptRotation();renderCatalog()}
 function toggleWish(id){if(wish.includes(id)){wish=wish.filter(x=>x!==id);toast("Removed from wishlist")}else{wish.push(id);toast("Added to wishlist")}save();renderCatalog();renderDeals();renderRecommendations()}
 function openProduct(id){
  currentProduct=products.find(p=>p.id===id);recordRecentlyViewed(id);const p=currentProduct, os=offers[id]||[[p.shop,p.price]];
