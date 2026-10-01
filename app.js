@@ -43,6 +43,11 @@ const influencerSpotlightItems = [
  {eyebrow:"CREATOR · X",name:"Waduwa Joel",handle:"@mbales_finest",platform:"X",icon:"𝕏",audience:"12K+ followers",reported:"Milestone reported Jul 2026",image:"https://www.ugnewsline.com/wp-content/uploads/2026/07/IMG-20260719-WA02091.jpg",profile:"https://x.com/mbales_finest",source:"https://www.ugnewsline.com/waduwa-joel-builds-mbales-brand-beyond-eastern-uganda/",sourceLabel:"Ugnews Line feature"},
  {eyebrow:"LOCAL MEDIA CHANNEL · YOUTUBE",name:"TARGET MEDIA MBALE",handle:"@Targetmediambale",platform:"YouTube",icon:"▶",audience:"956 subscribers",reported:"Public channel count · Oct 2026",image:"https://yt3.googleusercontent.com/bR_HkEml0xiA34kOdgZ9nqd_wfAeC2kIS7pilSM6_Pxtj-KGCfYX4Fhi4bVUtn9LGBOnpVau=s900-c-k-c0x00ffffff-no-rj",profile:"https://www.youtube.com/@Targetmediambale",source:"https://www.youtube.com/@Targetmediambale",sourceLabel:"YouTube channel"}
 ];
+const heroPromoItems = [
+ {eyebrow:"MBALE GROCERY PICKS",title:"Fresh essentials for every day.",description:"Build a better basket with local grocery prices and convenient pickup options.",image:"https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=900&q=85",action:"Browse grocery",actionType:"category",value:"Grocery"},
+ {eyebrow:"COMPARE BEFORE YOU CHOOSE",title:"One product. Several local offers.",description:"See seller options side by side and choose the offer that works for you.",image:"https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=900&q=85",action:"Compare products",actionType:"catalog"},
+ {eyebrow:"LOCAL SERVICES",title:"Find help around Mbale.",description:"Request quotes for repairs, events, cleaning, beauty and tech support.",image:"https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=900&q=85",action:"Explore services",actionType:"services"}
+];
 const products = [
 {id:1,name:"Samsung Galaxy A25 5G 128GB",cat:"Phones",shop:"Sms Phone And electronic center mbale",price:899000,old:1049000,rating:4.7,reviews:126,tag:"BEST SELLER",delivery:"Pickup / seller delivery",desc:"5G smartphone with vivid AMOLED display, reliable battery life and modern camera system.",image:img("photo-1511707171634-5f897ff02aa9")},
 {id:2,name:"iPhone 13 128GB",cat:"Phones",shop:"MY PHONES MBALE",price:1899000,old:2100000,rating:4.8,reviews:84,tag:"POPULAR",delivery:"Seller delivery",desc:"Premium Apple smartphone with strong camera performance and smooth everyday use.",image:img("photo-1592286927505-2fd0a2f6b5f0")},
@@ -75,7 +80,13 @@ const products = [
 {id:29,name:"Universal Car Phone Mount",cat:"Automotive",shop:"Sms Phone And electronic center mbale",price:35000,old:43000,rating:4.3,reviews:33,tag:"TRAVEL PICK",delivery:"Pickup available",desc:"Adjustable phone mount for vehicle dashboards and vents. Check fit and placement before driving.",image:img("photo-1492144534655-ae79c964c9d7")},
 {id:30,name:"A5 Notebook Set",cat:"Books & Stationery",shop:"Abrah Shopping Centre Mbale",price:18000,old:22000,rating:4.5,reviews:58,tag:"STUDY ESSENTIAL",delivery:"Store pickup",desc:"Set of lined notebooks for school, planning and everyday notes. Confirm page count with the seller.",image:img("photo-1531346878377-a5be20888e57")},
 {id:31,name:"Adult Dog Food 2kg",cat:"Pet Supplies",shop:"Map Supermarket",price:47000,old:55000,rating:4.2,reviews:19,tag:"PET CARE",delivery:"Store pickup",desc:"Packaged dog food. Check ingredients, feeding guidance and expiry date on the label.",image:img("photo-1589924691995-400dc9ecc119")},
-{id:32,name:"Classic Quartz Wristwatch",cat:"Jewelry & Watches",shop:"MY PHONES MBALE",price:95000,old:115000,rating:4.4,reviews:31,tag:"CLASSIC STYLE",delivery:"Pickup available",desc:"Quartz wristwatch with a versatile everyday design. Confirm colour, materials and warranty with the seller.",image:img("photo-1523275335684-37898b6baf30")}
+{id:32,name:"Classic Quartz Wristwatch",cat:"Jewelry & Watches",shop:"MY PHONES MBALE",price:95000,old:115000,rating:4.4,reviews:31,tag:"CLASSIC STYLE",delivery:"Pickup available",desc:"Quartz wristwatch with a versatile everyday design. Confirm colour, materials and warranty with the seller.",image:img("photo-1523275335684-37898b6baf30")},
+{id:33,name:"Fresh Milk 1 Litre",cat:"Grocery",shop:"Republic Super Market",price:5500,old:6500,rating:4.6,reviews:32,tag:"FRESH PICK",delivery:"Store pickup",desc:"Fresh household milk. Confirm brand, storage and expiry date with the seller.",image:img("photo-1550583724-b2692b85b150")},
+{id:34,name:"Sliced White Bread",cat:"Grocery",shop:"Map Supermarket",price:7000,old:8000,rating:4.5,reviews:44,tag:"BREAKFAST",delivery:"Store pickup",desc:"Everyday sliced bread. Stock and pack size may vary by seller.",image:img("photo-1509440159596-0249088772ff")},
+{id:35,name:"Brown Sugar 1kg",cat:"Grocery",shop:"Masse Supermarket",price:6500,old:7500,rating:4.5,reviews:28,tag:"PANTRY PICK",delivery:"Store pickup",desc:"Household sugar for tea and baking. Check packaging and expiry details before purchase.",image:img("photo-1581441363689-1f3c3c414635")},
+{id:36,name:"Dry Beans 1kg",cat:"Grocery",shop:"Republic Super Market",price:8000,old:9500,rating:4.4,reviews:36,tag:"VALUE",delivery:"Store pickup",desc:"Dry beans for everyday home cooking. Grade and origin can vary with stock.",image:img("photo-1551462147-ff29053bfc14")},
+{id:37,name:"Fresh Tomatoes 1kg",cat:"Grocery",shop:"Map Supermarket",price:6000,old:7000,rating:4.3,reviews:21,tag:"FRESH PRODUCE",delivery:"Store pickup",desc:"Fresh tomatoes for household meals. Confirm current freshness and weight with the seller.",image:img("photo-1546094096-0df4bcaaa337")},
+{id:38,name:"Maize Flour 2kg",cat:"Grocery",shop:"Masse Supermarket",price:9000,old:10500,rating:4.6,reviews:48,tag:"HOUSEHOLD FAVOURITE",delivery:"Store pickup",desc:"Maize flour for everyday meals. Confirm brand, pack size and expiry date before purchase.",image:img("photo-1606787366850-de6330128bfc")}
 ];
 const extraProductImages={
  "Automotive":["photo-1503376780353-7e6692767b70"],
@@ -96,7 +107,8 @@ const demoInventory = [
  {stock:10,sold:47},{stock:13,sold:32},{stock:30,sold:88},{stock:9,sold:41},
  {stock:6,sold:26},{stock:15,sold:43},{stock:19,sold:58},{stock:8,sold:63},
  {stock:0,sold:45},{stock:10,sold:29},{stock:22,sold:57},{stock:17,sold:36},
- {stock:12,sold:31},{stock:28,sold:92},{stock:7,sold:18},{stock:5,sold:27}
+ {stock:12,sold:31},{stock:28,sold:92},{stock:7,sold:18},{stock:5,sold:27},
+ {stock:18,sold:46},{stock:22,sold:63},{stock:15,sold:39},{stock:27,sold:71},{stock:12,sold:34},{stock:20,sold:58}
 ];
 
 const shops = [
@@ -129,6 +141,17 @@ const el=id=>document.getElementById(id);
 function save(){localStorage.setItem("mbaleCart",JSON.stringify(cart));localStorage.setItem("mbaleWish",JSON.stringify(wish));updateCartBadge()}
 function toast(t){el("toast").textContent=t;el("toast").classList.add("show");setTimeout(()=>el("toast").classList.remove("show"),2200)}
 function updateCartBadge(){el("cartCount").textContent=cart.reduce((s,x)=>s+x.qty,0)}
+const heroPromoTimers=new Map();
+function renderHeroPromos(){
+ const stage=el("heroPromoStage");
+ stage.innerHTML=heroPromoItems.map((promo,index)=>`<article class="heroPromo${index===0?" active":""}" aria-hidden="${index!==0}"><img src="${promo.image}" alt=""><div class="heroPromoShade"></div><div class="heroPromoCopy"><span class="eyebrow">${promo.eyebrow}</span><h1>${promo.title}</h1><p>${promo.description}</p><button class="cta" onclick="heroPromoAction('${promo.actionType}','${promo.value||""}')">${promo.action} <span aria-hidden="true">→</span></button></div><span class="heroPromoCount">${index+1} / ${heroPromoItems.length}</span></article>`).join("");
+ stage.addEventListener("mouseenter",pauseHeroPromos);stage.addEventListener("mouseleave",resumeHeroPromos);stage.addEventListener("focusin",pauseHeroPromos);stage.addEventListener("focusout",event=>{if(!stage.contains(event.relatedTarget))resumeHeroPromos()});
+ resumeHeroPromos();
+}
+function advanceHeroPromo(){const slides=[...el("heroPromoStage").querySelectorAll(".heroPromo")],current=slides.findIndex(slide=>slide.classList.contains("active")),next=(current+1)%slides.length;slides[current].classList.remove("active");slides[current].setAttribute("aria-hidden","true");slides[next].classList.add("active");slides[next].setAttribute("aria-hidden","false")}
+function pauseHeroPromos(){clearInterval(heroPromoTimers.get("hero"));heroPromoTimers.delete("hero")}
+function resumeHeroPromos(){pauseHeroPromos();heroPromoTimers.set("hero",setInterval(advanceHeroPromo,5000))}
+function heroPromoAction(type,value){if(type==="category")filterCategory(value);else if(type==="services")filterServiceCategory("all");else document.getElementById("catalog").scrollIntoView({behavior:"smooth"})}
 function changeCardImage(button,direction){
  const imageBox=button.closest(".productImg"),image=imageBox.querySelector(".productGalleryImage"),images=productGalleryImages.get(Number(image.dataset.productId));
  const nextIndex=(Number(image.dataset.imageIndex)+direction+images.length)%images.length;
@@ -315,4 +338,4 @@ function showAccount(){el("modal").innerHTML=`<button class="close" onclick="clo
 function showOrders(){el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>Your orders</h2><div class="empty">No orders yet.<br>Orders you place will appear here.</div></div>`;el("modalWrap").classList.add("show")}
 function showSell(){el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>Sell on Mbale Shopper</h2><p>List your shop and products so local customers can compare your offers.</p><div class="formGrid"><label>Business name<input placeholder="Shop name"></label><label>Contact phone<input placeholder="+256 ..."></label><label>Business category<select><option>Electronics</option><option>Fashion</option><option>Grocery</option><option>Home</option><option>Other</option></select></label><label>Location<input placeholder="Mbale area / landmark"></label><label class="full">Business description<textarea placeholder="Tell shoppers about your store"></textarea></label></div><button class="yellowBtn" style="margin-top:16px" onclick="toast('Seller application saved in demo');closeModal()">Submit seller application</button></div>`;el("modalWrap").classList.add("show")}
 function goHome(){window.scrollTo({top:0,behavior:"smooth"})}
-initCategories();initSearchPromptTrack();renderCategories();renderDeals();renderRecommendations();renderSpotlight("eventSpotlight","UPCOMING EVENTS",eventSpotlightItems,"event");renderSpotlight("influencerSpotlight","TOP CITY INFLUENCERS",influencerSpotlightItems,"influencer");renderServiceCategories();renderServiceFilters();renderServices();renderPartners();initSellerFilter();renderCatalog();updateCartBadge();resumeSearchPromptRotation();
+initCategories();initSearchPromptTrack();renderHeroPromos();renderCategories();renderDeals();renderRecommendations();renderSpotlight("eventSpotlight","UPCOMING EVENTS",eventSpotlightItems,"event");renderSpotlight("influencerSpotlight","TOP CITY INFLUENCERS",influencerSpotlightItems,"influencer");renderServiceCategories();renderServiceFilters();renderServices();renderPartners();initSellerFilter();renderCatalog();updateCartBadge();resumeSearchPromptRotation();
