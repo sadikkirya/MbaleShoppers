@@ -35,6 +35,14 @@ const services = [
  {id:"wedding-planning",name:"Wedding planning",category:"Events & catering",description:"Discuss planning support and coordination for your wedding day.",image:"photo-1519741497674-611481863552"},
  {id:"computer",name:"Phone & computer support",category:"Tech support",description:"Get help diagnosing common phone, laptop and setup issues.",image:"photo-1521737711867-e3b97375f902"}
 ];
+const eventSpotlightItems = [
+ {eyebrow:"UPCOMING · 3 OCT 2026",title:"Salam TV Uganda Finals",detail:"IUIU Main Campus · Mbale",image:"https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=240&q=80",href:"https://www.instagram.com/reel/Dd113D8oW7v/",linkLabel:"View event post",source:"Salam TV Uganda · Instagram"},
+ {eyebrow:"MORE MBALE EVENTS",title:"Check the city calendar",detail:"No other future dates are currently posted by Mbale City.",image:"https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=240&q=80",href:"https://www.mbalecity.go.ug/events-calendar",linkLabel:"Open official calendar",source:"Mbale City"}
+];
+const influencerSpotlightItems = [
+ {eyebrow:"CREATOR · X",name:"Waduwa Joel",handle:"@mbales_finest",platform:"X",icon:"𝕏",audience:"12K+ followers",reported:"Milestone reported Jul 2026",image:"https://www.ugnewsline.com/wp-content/uploads/2026/07/IMG-20260719-WA02091.jpg",profile:"https://x.com/mbales_finest",source:"https://www.ugnewsline.com/waduwa-joel-builds-mbales-brand-beyond-eastern-uganda/",sourceLabel:"Ugnews Line feature"},
+ {eyebrow:"LOCAL MEDIA CHANNEL · YOUTUBE",name:"TARGET MEDIA MBALE",handle:"@Targetmediambale",platform:"YouTube",icon:"▶",audience:"956 subscribers",reported:"Public channel count · Oct 2026",image:"https://yt3.googleusercontent.com/bR_HkEml0xiA34kOdgZ9nqd_wfAeC2kIS7pilSM6_Pxtj-KGCfYX4Fhi4bVUtn9LGBOnpVau=s900-c-k-c0x00ffffff-no-rj",profile:"https://www.youtube.com/@Targetmediambale",source:"https://www.youtube.com/@Targetmediambale",sourceLabel:"YouTube channel"}
+];
 const products = [
 {id:1,name:"Samsung Galaxy A25 5G 128GB",cat:"Phones",shop:"Sms Phone And electronic center mbale",price:899000,old:1049000,rating:4.7,reviews:126,tag:"BEST SELLER",delivery:"Pickup / seller delivery",desc:"5G smartphone with vivid AMOLED display, reliable battery life and modern camera system.",image:img("photo-1511707171634-5f897ff02aa9")},
 {id:2,name:"iPhone 13 128GB",cat:"Phones",shop:"MY PHONES MBALE",price:1899000,old:2100000,rating:4.8,reviews:84,tag:"POPULAR",delivery:"Seller delivery",desc:"Premium Apple smartphone with strong camera performance and smooth everyday use.",image:img("photo-1592286927505-2fd0a2f6b5f0")},
@@ -113,6 +121,7 @@ const offers = {
   12:[["Mobile Hub Uganda",120000],["P & T ELECTRONICS MBALE",125000],["VIVA ELECTRONICS",132000]]
 };
 let cart=JSON.parse(localStorage.getItem("mbaleCart")||"[]"), wish=JSON.parse(localStorage.getItem("mbaleWish")||"[]"), recentlyViewed=JSON.parse(localStorage.getItem("mbaleRecentlyViewed")||"[]"), currentProduct=null, activeSearchSuggestion=-1, activeServiceCategory="all";
+const spotlightTimers=new Map();
 const searchPromptExamples=[products[0].name,products[2].name,services[0].name,services[5].name,"Health & Pharmacy","Home & Kitchen"];
 
 const money=n=>"UGX "+Number(n).toLocaleString("en-UG");
@@ -149,9 +158,31 @@ function renderRecommendations(){
  signals.forEach(([id,weight])=>{const product=products.find(item=>item.id===id);if(product)categoryScores[product.cat]=(categoryScores[product.cat]||0)+weight});
  const preferredCategory=Object.keys(categoryScores).sort((a,b)=>categoryScores[b]-categoryScores[a])[0];
  let picks=preferredCategory?products.filter(product=>product.cat===preferredCategory&&!recentlyViewed.includes(product.id)):[];
- if(!picks.length)picks=products.slice().sort((a,b)=>b.rating-a.rating);
+ const fallback=products.slice().sort((a,b)=>b.rating-a.rating||(b.old-b.price)-(a.old-a.price));
+ fallback.forEach(product=>{if(picks.length<8&&!picks.some(item=>item.id===product.id))picks.push(product)});
  el("recommendationReason").textContent=preferredCategory?`More ${preferredCategory.toLowerCase()} picks based on your activity`:"Popular with Mbale shoppers";
  el("recommendationGrid").innerHTML=picks.slice(0,10).map(productCard).join("");
+}
+function renderSpotlight(containerId,title,items,type){
+ const container=el(containerId);
+ container.innerHTML=`<div class="spotlightHeading"><span>${title}</span><span class="spotlightCount">1 / ${items.length}</span></div><div class="spotlightViewport">${items.map((item,index)=>`<div class="spotlightSlide${index===0?" active":""}" aria-hidden="${index!==0}"><img class="spotlightImage${type==="influencer"?" influencerImage":""}" src="${item.image}" alt="${type==="influencer"?item.name:item.title}"><div class="spotlightCopy"><span class="spotlightEyebrow">${item.eyebrow}</span>${type==="event"?`<b>${item.title}</b><small>${item.detail}</small><a href="${item.href}" target="_blank" rel="noopener noreferrer">${item.linkLabel} <span aria-hidden="true">↗</span></a><small class="spotlightSource">${item.source}</small>`:`<b>${item.name}</b><span class="creatorHandle">${item.handle}</span><span class="creatorPlatform"><span class="platformIcon ${item.platform==="YouTube"?"youtubeIcon":""}" aria-hidden="true">${item.icon}</span>${item.platform} · ${item.audience}</span><small>${item.reported}</small><a href="${item.profile}" target="_blank" rel="noopener noreferrer">View profile <span aria-hidden="true">↗</span></a><small class="spotlightSource">Source: <a href="${item.source}" target="_blank" rel="noopener noreferrer">${item.sourceLabel}</a></small>`}</div></div>`).join("")}</div>`;
+ container.addEventListener("mouseenter",()=>pauseSpotlight(containerId));
+ container.addEventListener("mouseleave",()=>resumeSpotlight(containerId,items.length));
+ container.addEventListener("focusin",()=>pauseSpotlight(containerId));
+ container.addEventListener("focusout",event=>{if(!container.contains(event.relatedTarget))resumeSpotlight(containerId,items.length)});
+ resumeSpotlight(containerId,items.length);
+}
+function advanceSpotlight(containerId){
+ const container=el(containerId),slides=[...container.querySelectorAll(".spotlightSlide")],currentIndex=slides.findIndex(slide=>slide.classList.contains("active")),nextIndex=(currentIndex+1)%slides.length;
+ slides[currentIndex].classList.remove("active");slides[currentIndex].classList.add("leaving");slides[currentIndex].setAttribute("aria-hidden","true");
+ slides[nextIndex].classList.add("active");slides[nextIndex].setAttribute("aria-hidden","false");
+ container.querySelector(".spotlightCount").textContent=`${nextIndex+1} / ${slides.length}`;
+ setTimeout(()=>slides[currentIndex].classList.remove("leaving"),450);
+}
+function pauseSpotlight(containerId){clearInterval(spotlightTimers.get(containerId));spotlightTimers.delete(containerId)}
+function resumeSpotlight(containerId,count){
+ pauseSpotlight(containerId);
+ if(count>1)spotlightTimers.set(containerId,setInterval(()=>advanceSpotlight(containerId),5000));
 }
 function renderServiceCategories(){
  el("serviceCategoryGrid").innerHTML=serviceCategories.map(category=>`<button class="serviceCategoryTile" onclick="filterServiceCategory('${category.name}')"><img loading="lazy" src="${img(category.image)}" alt=""><span>${category.name}</span></button>`).join("");
@@ -284,4 +315,4 @@ function showAccount(){el("modal").innerHTML=`<button class="close" onclick="clo
 function showOrders(){el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>Your orders</h2><div class="empty">No orders yet.<br>Orders you place will appear here.</div></div>`;el("modalWrap").classList.add("show")}
 function showSell(){el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>Sell on Mbale Shopper</h2><p>List your shop and products so local customers can compare your offers.</p><div class="formGrid"><label>Business name<input placeholder="Shop name"></label><label>Contact phone<input placeholder="+256 ..."></label><label>Business category<select><option>Electronics</option><option>Fashion</option><option>Grocery</option><option>Home</option><option>Other</option></select></label><label>Location<input placeholder="Mbale area / landmark"></label><label class="full">Business description<textarea placeholder="Tell shoppers about your store"></textarea></label></div><button class="yellowBtn" style="margin-top:16px" onclick="toast('Seller application saved in demo');closeModal()">Submit seller application</button></div>`;el("modalWrap").classList.add("show")}
 function goHome(){window.scrollTo({top:0,behavior:"smooth"})}
-initCategories();initSearchPromptTrack();renderCategories();renderDeals();renderRecommendations();renderServiceCategories();renderServiceFilters();renderServices();renderPartners();initSellerFilter();renderCatalog();updateCartBadge();resumeSearchPromptRotation();
+initCategories();initSearchPromptTrack();renderCategories();renderDeals();renderRecommendations();renderSpotlight("eventSpotlight","UPCOMING EVENTS",eventSpotlightItems,"event");renderSpotlight("influencerSpotlight","TOP CITY INFLUENCERS",influencerSpotlightItems,"influencer");renderServiceCategories();renderServiceFilters();renderServices();renderPartners();initSellerFilter();renderCatalog();updateCartBadge();resumeSearchPromptRotation();
