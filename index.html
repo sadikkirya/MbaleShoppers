@@ -55,9 +55,19 @@
 <div class="productRail" id="dealGrid"></div>
 </section>
 
+<section class="section" id="serviceCategoriesSection">
+<div class="sectionHead"><div><span class="eyebrow sectionEyebrow">HELP FROM AROUND MBALE</span><h2>Services by category</h2></div><div class="shelfControls"><button class="shelfArrow" aria-label="Scroll service categories left" onclick="scrollShelf('serviceCategoryGrid',-1)">←</button><button class="shelfArrow" aria-label="Scroll service categories right" onclick="scrollShelf('serviceCategoryGrid',1)">→</button><button onclick="filterServiceCategory('all')">View all</button></div></div>
+<div class="serviceCategoryRail" id="serviceCategoryGrid"></div>
+</section>
+
 <section class="section recommendationSection">
 <div class="sectionHead"><div><span class="eyebrow sectionEyebrow">TUNED TO YOUR BROWSING</span><h2>Picked for you</h2><p id="recommendationReason">Popular with Mbale shoppers</p></div><div class="shelfControls"><button class="shelfArrow" aria-label="Scroll recommendations left" onclick="scrollShelf('recommendationGrid',-1)">←</button><button class="shelfArrow" aria-label="Scroll recommendations right" onclick="scrollShelf('recommendationGrid',1)">→</button></div></div>
 <div class="productRail" id="recommendationGrid"></div>
+</section>
+
+<section class="section" id="services">
+<div class="sectionHead"><div><span class="eyebrow sectionEyebrow">LOCAL HELP, ONE REQUEST AWAY</span><h2>Services around Mbale</h2><p id="serviceResultLabel">Example service listings · Request a quote directly</p></div><div class="shelfControls"><button class="shelfArrow" aria-label="Scroll services left" onclick="scrollShelf('serviceGrid',-1)">←</button><button class="shelfArrow" aria-label="Scroll services right" onclick="scrollShelf('serviceGrid',1)">→</button></div></div>
+<div class="productRail serviceRail" id="serviceGrid"></div>
 </section>
 
 <section class="section" id="catalog">

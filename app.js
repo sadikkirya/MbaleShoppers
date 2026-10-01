@@ -15,6 +15,23 @@ const categories = [
  {value:"Pet Supplies",label:"Pet Supplies",image:"photo-1548199973-03cce0bbc87b"},
  {value:"Jewelry & Watches",label:"Jewelry & Watches",image:"photo-1523275335684-37898b6baf30"}
 ];
+const serviceCategories = [
+ {name:"Home repairs",image:"photo-1607472586893-edb57bdc0e39"},
+ {name:"Beauty & grooming",image:"photo-1560066984-138dadb4c035"},
+ {name:"Cleaning",image:"photo-1581578731548-c64695cc6952"},
+ {name:"Auto care",image:"photo-1486262715619-67b85e0b08d3"},
+ {name:"Events & catering",image:"photo-1556911220-e15b29be8c8f"},
+ {name:"Tech support",image:"photo-1521737711867-e3b97375f902"}
+];
+const services = [
+ {id:"plumbing",name:"Plumbing repairs",category:"Home repairs",description:"Get help with leaks, taps, drainage and common household plumbing jobs.",image:"photo-1607472586893-edb57bdc0e39"},
+ {id:"electrical",name:"Electrical installation & repair",category:"Home repairs",description:"Request help with household wiring, lighting and electrical checks.",image:"photo-1621905251189-08b45d6a269e"},
+ {id:"salon",name:"Salon & barber services",category:"Beauty & grooming",description:"Find hair styling, grooming and beauty appointments near you.",image:"photo-1560066984-138dadb4c035"},
+ {id:"cleaning",name:"Home cleaning",category:"Cleaning",description:"Arrange help with regular home cleaning or a one-time deep clean.",image:"photo-1581578731548-c64695cc6952"},
+ {id:"mechanic",name:"Vehicle mechanic",category:"Auto care",description:"Request vehicle inspection, routine service and repair assistance.",image:"photo-1486262715619-67b85e0b08d3"},
+ {id:"catering",name:"Event catering",category:"Events & catering",description:"Discuss menus and food service for family or community gatherings.",image:"photo-1556911220-e15b29be8c8f"},
+ {id:"computer",name:"Phone & computer support",category:"Tech support",description:"Get help diagnosing common phone, laptop and setup issues.",image:"photo-1521737711867-e3b97375f902"}
+];
 const products = [
 {id:1,name:"Samsung Galaxy A25 5G 128GB",cat:"Phones",shop:"Sms Phone And electronic center mbale",price:899000,old:1049000,rating:4.7,reviews:126,tag:"BEST SELLER",delivery:"Pickup / seller delivery",desc:"5G smartphone with vivid AMOLED display, reliable battery life and modern camera system.",image:img("photo-1511707171634-5f897ff02aa9")},
 {id:2,name:"iPhone 13 128GB",cat:"Phones",shop:"MY PHONES MBALE",price:1899000,old:2100000,rating:4.8,reviews:84,tag:"POPULAR",delivery:"Seller delivery",desc:"Premium Apple smartphone with strong camera performance and smooth everyday use.",image:img("photo-1592286927505-2fd0a2f6b5f0")},
@@ -71,7 +88,7 @@ const offers = {
   11:[["Bam Shopping Center",285000],["Republic Super Market",299000]],
   12:[["Mobile Hub Uganda",120000],["P & T ELECTRONICS MBALE",125000],["VIVA ELECTRONICS",132000]]
 };
-let cart=JSON.parse(localStorage.getItem("mbaleCart")||"[]"), wish=JSON.parse(localStorage.getItem("mbaleWish")||"[]"), recentlyViewed=JSON.parse(localStorage.getItem("mbaleRecentlyViewed")||"[]"), currentProduct=null, activeSearchSuggestion=-1;
+let cart=JSON.parse(localStorage.getItem("mbaleCart")||"[]"), wish=JSON.parse(localStorage.getItem("mbaleWish")||"[]"), recentlyViewed=JSON.parse(localStorage.getItem("mbaleRecentlyViewed")||"[]"), currentProduct=null, activeSearchSuggestion=-1, activeServiceCategory="all";
 
 const money=n=>"UGX "+Number(n).toLocaleString("en-UG");
 const el=id=>document.getElementById(id);
@@ -101,6 +118,24 @@ function renderRecommendations(){
  if(!picks.length)picks=products.slice().sort((a,b)=>b.rating-a.rating);
  el("recommendationReason").textContent=preferredCategory?`More ${preferredCategory.toLowerCase()} picks based on your activity`:"Popular with Mbale shoppers";
  el("recommendationGrid").innerHTML=picks.slice(0,10).map(productCard).join("");
+}
+function renderServiceCategories(){
+ el("serviceCategoryGrid").innerHTML=serviceCategories.map(category=>`<button class="serviceCategoryTile" onclick="filterServiceCategory('${category.name}')"><img loading="lazy" src="${img(category.image)}" alt=""><span>${category.name}</span></button>`).join("");
+}
+function renderServices(){
+ const visibleServices=activeServiceCategory==="all"?services:services.filter(service=>service.category===activeServiceCategory);
+ el("serviceGrid").innerHTML=visibleServices.map(service=>`<article class="serviceCard"><div class="serviceImage"><img loading="lazy" src="${img(service.image)}" alt="${service.name}"></div><div class="serviceBody"><span class="serviceCategoryLabel">${service.category}</span><h3>${service.name}</h3><p>${service.description}</p><div class="serviceFoot"><small>Example listing · Mbale<br>Quote on request</small><button class="serviceRequest" onclick="requestService('${service.id}')">Request a quote</button></div></div></article>`).join("");
+ el("serviceResultLabel").textContent=activeServiceCategory==="all"?"Example service listings · Request a quote directly":`${visibleServices.length} example ${activeServiceCategory.toLowerCase()} listings`;
+}
+function filterServiceCategory(category){activeServiceCategory=category;renderServices();el("services").scrollIntoView({behavior:"smooth"})}
+function requestService(id){
+ const service=services.find(item=>item.id===id);
+ el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><span class="serviceCategoryLabel">${service.category}</span><h2>Request a quote</h2><p style="color:#667085">${service.name}. This demo does not send your request to a real provider.</p><div class="formGrid"><label>Your name<input id="serviceRequestName" placeholder="Full name"></label><label>Phone number<input id="serviceRequestPhone" placeholder="+256 ..."></label><label class="full">Your area in Mbale<input id="serviceRequestArea" placeholder="Area or landmark"></label><label class="full">What do you need?<textarea id="serviceRequestDetails" placeholder="Describe the service and preferred time"></textarea></label></div><button class="yellowBtn" style="margin-top:16px;width:100%" onclick="submitServiceRequest()">Send demo request</button></div>`;
+ el("modalWrap").classList.add("show");
+}
+function submitServiceRequest(){
+ if(!el("serviceRequestName").value.trim()||!el("serviceRequestPhone").value.trim()||!el("serviceRequestArea").value.trim()){toast("Please add your name, phone and Mbale area");return}
+ closeModal();toast("Demo service request recorded");
 }
 function scrollShelf(id,direction){const shelf=el(id),distance=id==="categories"?shelf.clientWidth*.8:510;shelf.scrollBy({left:direction*distance,behavior:"smooth"})}
 function handleSearchInput(event){renderCatalog();renderSearchSuggestions(event.target.value)}
@@ -193,4 +228,4 @@ function showAccount(){el("modal").innerHTML=`<button class="close" onclick="clo
 function showOrders(){el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>Your orders</h2><div class="empty">No orders yet.<br>Orders you place will appear here.</div></div>`;el("modalWrap").classList.add("show")}
 function showSell(){el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>Sell on Mbale Shopper</h2><p>List your shop and products so local customers can compare your offers.</p><div class="formGrid"><label>Business name<input placeholder="Shop name"></label><label>Contact phone<input placeholder="+256 ..."></label><label>Business category<select><option>Electronics</option><option>Fashion</option><option>Grocery</option><option>Home</option><option>Other</option></select></label><label>Location<input placeholder="Mbale area / landmark"></label><label class="full">Business description<textarea placeholder="Tell shoppers about your store"></textarea></label></div><button class="yellowBtn" style="margin-top:16px" onclick="toast('Seller application saved in demo');closeModal()">Submit seller application</button></div>`;el("modalWrap").classList.add("show")}
 function goHome(){window.scrollTo({top:0,behavior:"smooth"})}
-initCategories();renderCategories();renderDeals();renderRecommendations();renderPartners();initSellerFilter();renderCatalog();updateCartBadge();
+initCategories();renderCategories();renderDeals();renderRecommendations();renderServiceCategories();renderServices();renderPartners();initSellerFilter();renderCatalog();updateCartBadge();
