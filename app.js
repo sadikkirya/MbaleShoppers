@@ -132,12 +132,17 @@ const offers = {
   11:[["Bam Shopping Center",285000],["Republic Super Market",299000]],
   12:[["Mobile Hub Uganda",120000],["P & T ELECTRONICS MBALE",125000],["VIVA ELECTRONICS",132000]]
 };
-let cart=JSON.parse(localStorage.getItem("mbaleCart")||"[]"), wish=JSON.parse(localStorage.getItem("mbaleWish")||"[]"), recentlyViewed=JSON.parse(localStorage.getItem("mbaleRecentlyViewed")||"[]"), currentProduct=null, activeSearchSuggestion=-1, activeServiceCategory="all";
+let cart=JSON.parse(localStorage.getItem("mbaleCart")||"[]"), wish=JSON.parse(localStorage.getItem("mbaleWish")||"[]"), recentlyViewed=JSON.parse(localStorage.getItem("mbaleRecentlyViewed")||"[]"), currentProduct=null, activeSearchSuggestion=-1, activeServiceCategory="all", selectedOfferIndexes={};
 const spotlightTimers=new Map();
 const searchPromptExamples=[products[0].name,products[2].name,services[0].name,services[5].name,"Health & Pharmacy","Home & Kitchen"];
 
 const money=n=>"UGX "+Number(n).toLocaleString("en-UG");
 const el=id=>document.getElementById(id);
+function getProductOffer(id,index=selectedOfferIndexes[id]||0){
+ const product=products.find(item=>item.id===Number(id));
+ const productOffers=offers[id]||[[product.shop,product.price]];
+ return productOffers[index]||productOffers[0];
+}
 function save(){localStorage.setItem("mbaleCart",JSON.stringify(cart));localStorage.setItem("mbaleWish",JSON.stringify(wish));updateCartBadge()}
 function toast(t){el("toast").textContent=t;el("toast").classList.add("show");setTimeout(()=>el("toast").classList.remove("show"),2200)}
 function updateCartBadge(){el("cartCount").textContent=cart.reduce((s,x)=>s+x.qty,0)}
@@ -305,16 +310,20 @@ function initCategoryMegaMenu(){
  menu.addEventListener("mouseenter",()=>clearTimeout(megaMenuCloseTimer));menu.addEventListener("mouseleave",scheduleMegaMenuClose);
 }
 function renderDeals(){el("dealGrid").innerHTML=products.filter(p=>p.old>p.price).sort((a,b)=>(b.old-b.price)/b.old-(a.old-a.price)/a.old).slice(0,10).map(productCard).join("")}
-function renderRecommendations(){
+function getRecommendedProducts(excludeId=null){
  const signals=[...recentlyViewed.map(id=>[id,3]),...wish.map(id=>[id,2]),...cart.map(item=>[item.id,1])];
  const categoryScores={};
  signals.forEach(([id,weight])=>{const product=products.find(item=>item.id===id);if(product)categoryScores[product.cat]=(categoryScores[product.cat]||0)+weight});
  const preferredCategory=Object.keys(categoryScores).sort((a,b)=>categoryScores[b]-categoryScores[a])[0];
- let picks=preferredCategory?products.filter(product=>product.cat===preferredCategory&&!recentlyViewed.includes(product.id)):[];
+ let picks=preferredCategory?products.filter(product=>product.cat===preferredCategory&&!recentlyViewed.includes(product.id)&&product.id!==excludeId):[];
  const fallback=products.slice().sort((a,b)=>b.rating-a.rating||(b.old-b.price)-(a.old-a.price));
- fallback.forEach(product=>{if(picks.length<8&&!picks.some(item=>item.id===product.id))picks.push(product)});
+ fallback.forEach(product=>{if(picks.length<8&&product.id!==excludeId&&!picks.some(item=>item.id===product.id))picks.push(product)});
+ return {picks:picks.slice(0,10),preferredCategory};
+}
+function renderRecommendations(){
+ const {picks,preferredCategory}=getRecommendedProducts();
  el("recommendationReason").textContent=preferredCategory?`More ${preferredCategory.toLowerCase()} picks based on your activity`:"Popular with Mbale shoppers";
- el("recommendationGrid").innerHTML=picks.slice(0,10).map(productCard).join("");
+ el("recommendationGrid").innerHTML=picks.map(productCard).join("");
 }
 function renderSpotlight(containerId,title,items,type){
  const container=el(containerId);
@@ -448,12 +457,56 @@ function filterProductGroup(productIds){
 function filterDeals(){el("searchInput").value="";syncSearchPromptState();resumeSearchPromptRotation();document.getElementById("catalog").scrollIntoView();el("sort").value="featured";renderCatalog()}
 function clearFilters(){activeCatalogProductIds=null;document.querySelectorAll(".filters input[type=checkbox]").forEach(x=>x.checked=false);el("priceRange").value=2000000;el("sellerFilter").value="all";el("searchInput").value="";el("searchCat").value="all";syncSearchPromptState();resumeSearchPromptRotation();renderCatalog()}
 function toggleWish(id){if(wish.includes(id)){wish=wish.filter(x=>x!==id);toast("Removed from wishlist")}else{wish.push(id);toast("Added to wishlist")}save();renderCatalog();renderDeals();renderRecommendations()}
-function openProduct(id){
- currentProduct=products.find(p=>p.id===id);recordRecentlyViewed(id);const p=currentProduct, os=offers[id]||[[p.shop,p.price]];
- const images=productGalleryImages.get(p.id)||[p.image];
- el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="productDetail"><div class="detailImg"><img class="detailGalleryImage" data-product-id="${p.id}" data-image-index="0" src="${images[0]}" alt="${p.name}">${images.length>1?`<div class="detailGalleryControls"><button type="button" aria-label="Previous image of ${p.name}" onclick="changeDetailImage(this,-1)">‹</button><span class="detailGalleryCount">1 / ${images.length}</span><button type="button" aria-label="Next image of ${p.name}" onclick="changeDetailImage(this,1)">›</button></div>`:""}</div><div class="detailBody"><div class="rating">★ ${p.rating} • ${p.reviews} reviews</div><h2>${p.name}</h2><p style="color:#667085">${p.desc}</p><div class="bigPrice">${money(p.price)} <span class="old">${money(p.old)}</span></div><div class="detailMeta"><span class="pill">✓ Mbale seller</span><span class="pill">↻ Return policy shown below</span><span class="pill">⚡ Local pickup/delivery</span></div><h3>Compare seller offers</h3>${os.map((o,i)=>`<div class="offer ${i===0?"best":""}"><div><b>${o[0]}</b><small>${i===0?"Lowest listed offer":"Alternative seller offer"} • Terms may vary</small></div><strong>${money(o[1])}</strong></div>`).join("")}<div style="display:flex;gap:9px;margin-top:16px"><button class="yellowBtn" onclick="addToCart(${p.id})">Add to cart</button><button class="primary" onclick="buyNow(${p.id})">Buy now</button></div><div class="tabs"><span class="tab active" onclick="showTab('details')">Details</span><span class="tab" onclick="showTab('seller')">Seller</span><span class="tab" onclick="showTab('returns')">Returns</span><span class="tab" onclick="showTab('terms')">Terms</span></div><div id="tabPane" class="tabPane"><b>Product details</b><br>${p.desc}<br><br><b>Availability:</b> Seller stock must be confirmed before checkout.</div></div></div>`;
- el("modalWrap").classList.add("show");
+function productShelfMarkup(id,title,description,items){
+ if(!items.length)return "";
+ return `<section class="section productShelf"><div class="sectionHead"><div><h2>${title}</h2><p>${description}</p></div><div class="shelfControls"><button class="shelfArrow" aria-label="Scroll ${title} left" onclick="scrollShelf('${id}',-1)">←</button><button class="shelfArrow" aria-label="Scroll ${title} right" onclick="scrollShelf('${id}',1)">→</button></div></div><div class="productRail" id="${id}">${items.map(productCard).join("")}</div></section>`;
 }
+function renderProductPage(p){
+ const os=offers[p.id]||[[p.shop,p.price]],images=productGalleryImages.get(p.id)||[p.image];
+ const sellerProducts=products.filter(product=>product.shop===p.shop&&product.id!==p.id);
+ const sameCategory=products.filter(product=>product.cat===p.cat&&product.id!==p.id);
+ const customersViewed=sameCategory.slice().sort((a,b)=>b.reviews-a.reviews||b.rating-a.rating).slice(0,10);
+ const related=sameCategory.slice().sort((a,b)=>Number(b.name.split(" ")[0]===p.name.split(" ")[0])-Number(a.name.split(" ")[0]===p.name.split(" ")[0])||b.rating-a.rating).slice(0,10);
+ const {picks,preferredCategory}=getRecommendedProducts(p.id);
+ el("productPage").innerHTML=`<button class="productBack" type="button" onclick="closeProductPage()"><span aria-hidden="true">←</span> Back to shopping</button><div class="productDetail"><div class="detailImg"><img class="detailGalleryImage" data-product-id="${p.id}" data-image-index="0" src="${images[0]}" alt="${p.name}">${images.length>1?`<div class="detailGalleryControls"><button type="button" aria-label="Previous image of ${p.name}" onclick="changeDetailImage(this,-1)">‹</button><span class="detailGalleryCount">1 / ${images.length}</span><button type="button" aria-label="Next image of ${p.name}" onclick="changeDetailImage(this,1)">›</button></div>`:""}</div><div class="detailBody"><div class="rating">★ ${p.rating} • ${p.reviews} reviews</div><h1>${p.name}</h1><p class="productDescription">${p.desc}</p><div class="bigPrice">${money(p.price)} <span class="old">${money(p.old)}</span></div><div class="detailMeta"><span class="pill">✓ Mbale seller</span><span class="pill">↻ Return policy shown below</span><span class="pill">⚡ Local pickup/delivery</span></div><h3>Compare seller offers</h3>${os.map((o,i)=>`<div class="offer ${i===0?"best":""}"><div><b>${o[0]}</b><small>${i===0?"Lowest listed offer":"Alternative seller offer"} • Terms may vary</small></div><strong>${money(o[1])}</strong></div>`).join("")}<div class="productActions"><button class="yellowBtn" onclick="addToCart(${p.id})">Add to cart</button><button class="primary" onclick="buyNow(${p.id})">Buy now</button></div><div class="tabs"><span class="tab active" onclick="showTab('details')">Details</span><span class="tab" onclick="showTab('seller')">Seller</span><span class="tab" onclick="showTab('returns')">Returns</span><span class="tab" onclick="showTab('terms')">Terms</span></div><div id="tabPane" class="tabPane"><b>Product details</b><br>${p.desc}<br><br><b>Availability:</b> Seller stock must be confirmed before checkout.</div></div></div>${productShelfMarkup("sellerProductGrid","More from "+p.shop,"Browse other products from this seller.",sellerProducts)}${productShelfMarkup("customersViewedGrid","Customers also viewed","Popular products in this category.",customersViewed)}${productShelfMarkup("relatedProductGrid","Related products","More products from the same category.",related)}${productShelfMarkup("productPicksGrid","Top picks for you",preferredCategory?`Selected from your activity in ${preferredCategory.toLowerCase()}.`:"Popular picks from Mbale shoppers.",picks)}`;
+ initializeProductOffers(p);
+ el("productPage").hidden=false;document.querySelector("main.container").classList.add("productView");window.scrollTo({top:0,behavior:"smooth"});
+}
+function initializeProductOffers(product){
+ const offerElements=el("productPage").querySelectorAll(".offer");
+ offerElements.forEach((offerElement,index)=>{
+  offerElement.classList.add("offerOption");offerElement.setAttribute("role","button");offerElement.setAttribute("tabindex","0");
+  offerElement.addEventListener("click",()=>selectProductOffer(product.id,index));
+  offerElement.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();selectProductOffer(product.id,index)}});
+ });
+ selectProductOffer(product.id,selectedOfferIndexes[product.id]||0);
+}
+function selectProductOffer(id,index){
+ const selectedProduct=products.find(product=>product.id===Number(id));
+ const productOffers=offers[id]||[[selectedProduct.shop,selectedProduct.price]];
+ if(!productOffers[index]||currentProduct?.id!==Number(id))return;
+ selectedOfferIndexes[id]=index;
+ el("productPage").querySelectorAll(".offerOption").forEach((offerElement,offerIndex)=>{
+  const selected=offerIndex===index;offerElement.classList.toggle("selected",selected);offerElement.setAttribute("aria-pressed",String(selected));
+ });
+ el("productPage").querySelector(".bigPrice").firstChild.textContent=money(productOffers[index][1])+" ";
+}
+function openProduct(id,fromHistory=false){
+ const product=products.find(item=>item.id===Number(id));if(!product)return;
+ if(!fromHistory)history.pushState({productId:product.id},"",`#product-${product.id}`);
+ currentProduct=product;recordRecentlyViewed(product.id);renderProductPage(product);
+}
+function showStorefront(){
+ el("productPage").hidden=true;document.querySelector("main.container").classList.remove("productView");currentProduct=null;
+}
+function closeProductPage(){
+ if(history.state?.productId){history.back();return}
+ history.replaceState(null,"",`${location.pathname}${location.search}`);showStorefront();document.getElementById("catalog").scrollIntoView({behavior:"smooth"});
+}
+window.addEventListener("popstate",event=>{
+ const productId=event.state?.productId||Number(location.hash.match(/^#product-(\d+)$/)?.[1]);
+ if(productId)openProduct(productId,true);else showStorefront();
+});
 function showTab(t){
  const p=currentProduct;
  const content={details:`<b>Product details</b><br>${p.desc}<br><br><b>Important:</b> Product specifications, colour, size and stock can vary by seller. Confirm before payment.`,seller:`<b>Seller information</b><br><strong>${p.shop}</strong><br>Mbale, Uganda<br><br>Seller ratings and store information are displayed where available. Contact the seller to confirm stock, warranty and delivery before purchase.`,returns:`<b>Returns & refunds</b><br>Return terms are seller- and category-dependent. Items should normally be unused, undamaged and in original packaging. Start a return request through your order record and provide the reason and supporting information.<br><br><b>Demo marketplace rule:</b> seller-specific return windows must be displayed on the final checkout/order page before payment.`,terms:`<b>Terms & conditions</b><br>Mbale Shopper provides the marketplace interface; participating sellers are responsible for listing accuracy, stock, pricing, fulfilment and seller-specific warranties. Prices in this demo are illustrative. A purchase becomes binding only after the marketplace confirms the order.`};
@@ -461,17 +514,22 @@ function showTab(t){
  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));event?.target?.classList.add("active");
 }
 function closeModal(){el("modalWrap").classList.remove("show")}
-function addToCart(id){if(demoInventory[id-1]?.stock===0){toast("This item is out of stock");return}const found=cart.find(x=>x.id===id);if(found)found.qty++;else cart.push({id,qty:1});save();renderRecommendations();toast("Added to cart");}
-function buyNow(id){if(demoInventory[id-1]?.stock===0){toast("This item is out of stock");return}addToCart(id);closeModal();toggleCart()}
+function addToCart(id,offerIndex=selectedOfferIndexes[id]||0){
+ if(demoInventory[id-1]?.stock===0){toast("This item is out of stock");return}
+ const product=products.find(item=>item.id===id),[seller,price]=getProductOffer(id,offerIndex),found=cart.find(item=>item.id===id&&(item.seller||product.shop)===seller&&Number(item.price??product.price)===price);
+ if(found)found.qty++;else cart.push({id,qty:1,seller,price});
+ save();renderRecommendations();renderCart();toast(`Added from ${seller}`);
+}
+function buyNow(id,offerIndex=selectedOfferIndexes[id]||0){if(demoInventory[id-1]?.stock===0){toast("This item is out of stock");return}addToCart(id,offerIndex);closeModal();toggleCart()}
 function toggleCart(){el("cartDrawer").classList.toggle("show");renderCart()}
 function renderCart(){
  const box=el("cartItems");if(!cart.length){box.innerHTML='<div class="empty" style="margin-top:20px">Your cart is empty.<br><button class="primary" style="margin-top:12px" onclick="toggleCart();document.getElementById(\'catalog\').scrollIntoView()">Start shopping</button></div>';el("cartTotal").textContent="UGX 0";return}
- let total=0;box.innerHTML=cart.map(c=>{const p=products.find(x=>x.id===c.id);total+=p.price*c.qty;return `<div class="cartItem"><img src="${p.image}"><div><b style="font-size:12px">${p.name}</b><div style="font-size:11px;color:#667085">${p.shop}</div><div class="qty"><button onclick="changeQty(${p.id},-1)">−</button><span>${c.qty}</span><button onclick="changeQty(${p.id},1)">+</button></div></div><b>${money(p.price*c.qty)}</b></div>`}).join("");el("cartTotal").textContent=money(total);
+ let total=0;box.innerHTML=cart.map((item,index)=>{const product=products.find(entry=>entry.id===item.id),price=Number(item.price??product.price),seller=item.seller||product.shop;total+=price*item.qty;return `<div class="cartItem"><img src="${product.image}" alt=""><div><b style="font-size:12px">${product.name}</b><div style="font-size:11px;color:#667085">${seller}</div><div class="qty"><button aria-label="Remove one ${product.name}" onclick="changeQty(${index},-1)">−</button><span>${item.qty}</span><button aria-label="Add one ${product.name}" onclick="changeQty(${index},1)">+</button></div></div><b>${money(price*item.qty)}</b></div>`}).join("");el("cartTotal").textContent=money(total);
 }
-function changeQty(id,d){const c=cart.find(x=>x.id===id);if(!c)return;c.qty+=d;if(c.qty<=0)cart=cart.filter(x=>x.id!==id);save();renderCart()}
+function changeQty(index,d){const item=cart[index];if(!item)return;item.qty+=d;if(item.qty<=0)cart.splice(index,1);save();renderCart()}
 function checkout(){
  if(!cart.length){toast("Your cart is empty");return}
- const total=cart.reduce((s,c)=>s+products.find(p=>p.id===c.id).price*c.qty,0);
+ const total=cart.reduce((sum,item)=>sum+Number(item.price??products.find(product=>product.id===item.id).price)*item.qty,0);
  el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>Checkout</h2><p style="color:#667085">Review your delivery details and choose a payment method. This demo does not process real payments.</p><div class="formGrid"><div><label>Full name<input placeholder="Your name"></label></div><div><label>Phone number<input placeholder="+256 ..."></label></div><div class="full"><label>Delivery address<textarea placeholder="Area, street, landmark, Mbale"></textarea></label></div><div><label>Delivery method<select><option>Seller delivery</option><option>Pickup from shop</option></select></label></div><div><label>Payment method<select><option>Mobile Money</option><option>Cash on delivery</option><option>Card</option></select></label></div></div><div style="background:#f8fafc;padding:14px;border-radius:9px;margin:18px 0"><b>Order total: ${money(total)}</b><br><small style="color:#667085">Delivery fees and seller terms are confirmed before final order placement.</small></div><button class="yellowBtn" style="width:100%" onclick="placeOrder()">Place demo order</button></div>`;
  el("modalWrap").classList.add("show");el("cartDrawer").classList.remove("show");
 }
@@ -483,5 +541,6 @@ function showPolicy(type){
 function showAccount(){el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>My account</h2><p>Sign in or create an account to manage orders, addresses, wishlist and seller messages.</p><div class="formGrid"><label>Email / phone<input placeholder="Email or phone"></label><label>Password<input type="password" placeholder="Password"></label></div><button class="yellowBtn" style="margin-top:16px;width:100%" onclick="toast('Demo sign-in');closeModal()">Sign in</button></div>`;el("modalWrap").classList.add("show")}
 function showOrders(){el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>Your orders</h2><div class="empty">No orders yet.<br>Orders you place will appear here.</div></div>`;el("modalWrap").classList.add("show")}
 function showSell(){el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>Sell on Mbale Shopper</h2><p>List your shop and products so local customers can compare your offers.</p><div class="formGrid"><label>Business name<input placeholder="Shop name"></label><label>Contact phone<input placeholder="+256 ..."></label><label>Business category<select><option>Electronics</option><option>Fashion</option><option>Grocery</option><option>Home</option><option>Other</option></select></label><label>Location<input placeholder="Mbale area / landmark"></label><label class="full">Business description<textarea placeholder="Tell shoppers about your store"></textarea></label></div><button class="yellowBtn" style="margin-top:16px" onclick="toast('Seller application saved in demo');closeModal()">Submit seller application</button></div>`;el("modalWrap").classList.add("show")}
-function goHome(){window.scrollTo({top:0,behavior:"smooth"})}
+function goHome(){if(!el("productPage").hidden){closeProductPage();return}window.scrollTo({top:0,behavior:"smooth"})}
 initCategories();initSearchPromptTrack();initCategoryMegaMenu();renderHeroPromos();renderCategories();renderDeals();renderRecommendations();renderSpotlight("eventSpotlight","UPCOMING EVENTS",eventSpotlightItems,"event");renderSpotlight("influencerSpotlight","TOP CITY INFLUENCERS",influencerSpotlightItems,"influencer");renderServiceCategories();renderServiceFilters();renderServices();renderPartners();initSellerFilter();renderCatalog();updateCartBadge();resumeSearchPromptRotation();
+const initialProductId=Number(location.hash.match(/^#product-(\d+)$/)?.[1]);if(initialProductId)openProduct(initialProductId,true);
