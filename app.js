@@ -247,6 +247,7 @@ function renderElectronicsMegaMenu(menu){
  const phoneAccessoryProducts=products.filter(product=>["Phones","Electronics"].includes(product.cat)||/\bphone mount\b/i.test(product.name));
  const computerProducts=products.filter(product=>product.cat==="Computers & Gaming"&&/(laptop|computer|notebook|desktop)/i.test(product.name));
  const gamingProducts=products.filter(product=>product.cat==="Computers & Gaming"&&/(gaming|game|controller|console)/i.test(product.name));
+ const homeKitchenGroup='<section class="megaCategory"><button class="megaCategoryTitle" onclick="filterCategory(\'Home\')">Home &amp; Kitchen</button></section>';
  const accessoryGroups=new Map();
  phoneAccessoryProducts.forEach(product=>{
   const label=electronicsAccessoryGroup(product);
@@ -258,9 +259,10 @@ function renderElectronicsMegaMenu(menu){
  const sections=[
   renderMegaCategory("Phones and accessories",phoneAccessoryProducts,accessoryMarkup),
   renderMegaCategory("Computers",computerProducts,""),
-  renderMegaCategory("Gaming",gamingProducts,"")
+  renderMegaCategory("Gaming",gamingProducts,""),
+  homeKitchenGroup
  ];
- const total=phoneAccessoryProducts.length+computerProducts.length+gamingProducts.length;
+ const total=phoneAccessoryProducts.length+computerProducts.length+gamingProducts.length+products.filter(product=>product.cat==="Home").length;
  menu.innerHTML=`<div class="megaInner"><div class="megaHeader"><h3>Electronics</h3><small>${total} products available</small></div><div class="megaCategories">${sections.join("")}</div></div>`;
 }
 function renderCategoryMegaMenu(category){
@@ -292,7 +294,7 @@ function initCategoryMegaMenu(){
  scroller.addEventListener("scroll",updateCategoryNavArrows,{passive:true});
  window.addEventListener("resize",updateCategoryNavArrows);
  requestAnimationFrame(updateCategoryNavArrows);
- document.querySelectorAll('.categoryNavLink[data-category="Phones"], .categoryNavLink[data-category="Computers & Gaming"]').forEach(link=>link.remove());
+ document.querySelectorAll('.categoryNavLink[data-category="Phones"], .categoryNavLink[data-category="Computers & Gaming"], .categoryNavLink[data-category="Home"]').forEach(link=>link.remove());
  document.querySelectorAll(".categoryNavLink").forEach(link=>{link.addEventListener("mouseenter",()=>{clearTimeout(megaMenuCloseTimer);renderCategoryMegaMenu(link.dataset.category)});link.addEventListener("mouseleave",scheduleMegaMenuClose)});
  menu.addEventListener("mouseenter",()=>clearTimeout(megaMenuCloseTimer));menu.addEventListener("mouseleave",scheduleMegaMenuClose);
 }
