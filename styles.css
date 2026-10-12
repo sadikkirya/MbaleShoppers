@@ -149,3 +149,93 @@ a{color:inherit;text-decoration:none}
 @media(max-width:600px){.messagesView .messageListItem{flex-direction:row!important;flex-wrap:wrap;align-items:center;gap:5px;padding:8px 26px 8px 6px}.messagesView .messageListItem .messageAvatar{flex-basis:27px;width:27px;height:27px}.messagesView .messageListCopy{width:auto;flex:1 1 0%;gap:2px 5px}.messagesView .messageListCopy strong{font-size:9px}.messagesView .messageListCopy .messageListPresence{font-size:8px;white-space:normal}.messagesView .messageListReceipt{font-size:8px}.messagesView .messageCount,.messagesView .messageUnreadCount{z-index:1}}
 .messagesBack{display:none}
 @media(max-width:600px){.messagesView:not(.chatSelected){grid-template-columns:minmax(0,1fr)}.messagesView:not(.chatSelected) .messageThread{display:none}.messagesView:not(.chatSelected) .messagesSidebar{border-right:0}.messagesView.chatSelected{grid-template-columns:minmax(0,1fr)}.messagesView.chatSelected .messagesSidebar{display:none}.messagesBack{display:grid;flex:none;width:30px;height:30px;place-items:center;border-radius:50%;background:#f2f4f7;color:var(--ink);font-size:24px;line-height:1}}
+.sellerNavToggle,.sellerInboxBack{display:none}
+@media(max-width:760px){
+ .sellerNavToggle{display:grid;width:34px;height:34px;flex:none;place-items:center;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);font-size:18px}
+ .sellerWorkspaceLayout{position:relative;display:block;overflow:hidden}
+ .sellerWorkspaceNav{position:absolute;z-index:5;inset:0 auto 0 0;width:min(240px,82vw);padding:12px 9px;border-right:1px solid var(--line);box-shadow:8px 0 22px #0002;transform:translateX(-105%);transition:transform .2s ease}
+ .sellerWorkspace.navOpen .sellerWorkspaceNav{transform:translateX(0)}
+ #sellerWorkspaceContent .sellerInbox{grid-template-columns:minmax(0,1fr)}
+ #sellerWorkspaceContent .sellerInbox.chatSelected{grid-template-columns:minmax(0,1fr)}
+ #sellerWorkspaceContent .sellerInbox:not(.chatSelected) .sellerInboxThread{display:none}
+ #sellerWorkspaceContent .sellerInbox:not(.chatSelected) .sellerInboxList{border-right:0}
+ #sellerWorkspaceContent .sellerInbox.chatSelected .sellerInboxList{display:none}
+ .sellerInboxBack{display:grid;width:30px;height:30px;flex:none;place-items:center;border-radius:50%;background:#f2f4f7;color:var(--ink);font-size:24px;line-height:1}
+ .sellerInboxThread .messageThreadHeader{justify-content:flex-start}
+}
+
+@media(max-width:760px){
+ html{scroll-padding-top:112px}
+ .navScroller{scroll-padding-inline:12px;-webkit-overflow-scrolling:touch}
+ .nav a{padding:8px 0}
+ .headActions{margin-left:auto;gap:3px}
+ .action{min-width:40px;min-height:40px;justify-content:center}
+ .sectionHead{align-items:flex-start;gap:10px}
+ .sectionHead>div{min-width:0}
+ .shelfControls{flex:none}
+ .productRail,.catgrid,.serviceCategoryRail,.serviceFilters{scrollbar-width:none;-webkit-overflow-scrolling:touch}
+ .productRail::-webkit-scrollbar,.catgrid::-webkit-scrollbar,.serviceCategoryRail::-webkit-scrollbar,.serviceFilters::-webkit-scrollbar{display:none}
+ .catalogTop{gap:8px}
+ .catalogTools{flex:none}
+ .catalogTools select,.filterToggle{min-height:40px}
+ .grid .card{min-width:0}
+ .cardBody{padding:10px}
+ .grid .title{min-height:0;font-size:12px;line-height:1.3}
+ .grid .inventoryMeta{flex-wrap:wrap;font-size:9px}
+ .detailMeta{gap:6px}
+ .productActions>*{min-width:0;min-height:44px;flex:1;padding:10px}
+ .productPage .offer{align-items:flex-start;flex-wrap:wrap}
+ .productPage .tabs{gap:18px;overflow-x:auto;scrollbar-width:none}
+ .productPage .tab{flex:none}
+ .modalWrap{align-items:flex-end;padding:8px}
+ #modal:not(:has(.messagesView,.sellerWorkspace)){width:100%;max-height:calc(100dvh - 16px);border-radius:14px 14px 8px 8px;overflow:auto}
+ .form{padding:20px}
+ .form input,.form textarea,.form select{min-height:44px;font-size:16px}
+ .drawer{width:100%;width:min(470px,100vw);padding-bottom:env(safe-area-inset-bottom)}
+ .toast{bottom:calc(16px + env(safe-area-inset-bottom));width:max-content;max-width:calc(100vw - 32px);text-align:center}
+ .footer li{padding:3px 0}
+}
+@media(max-width:430px){
+ .header{padding:8px 3%}
+ .headrow{gap:6px}
+ .logo{gap:6px;font-size:17px}
+ .logoMark{width:32px;height:32px;border-radius:8px}
+ .headActions{gap:1px}
+ .action{min-width:36px;padding:6px}
+ .search{height:42px;min-width:0}
+ .search select{max-width:106px;padding:0 6px;font-size:11px}
+ .search button{width:44px}
+ .nav{gap:4px}
+ .navScrollArrow{width:26px;height:26px}
+ .container{padding:12px 3%}
+ .heroMain{min-height:260px}
+ .heroSide{gap:8px}
+ .sectionHead h2{font-size:17px;line-height:1.25}
+ .sectionHead p{font-size:11px}
+ .sectionHead>.shelfControls{gap:2px}
+ .shelfArrow{width:28px;height:28px}
+ .cat{flex-basis:84px;width:84px;min-width:84px;height:88px}
+ .productRail .card{flex-basis:76vw;max-width:280px}
+ .grid{gap:7px}
+ .grid .productImg{height:clamp(96px,34vw,138px)}
+ .grid .cardBody{padding:8px}
+ .grid .title{font-size:11px}
+ .grid .price{font-size:14px}
+ .grid .inventoryMeta{display:grid;gap:3px}
+ .catalogTop{align-items:center}
+ .catalogTop>b{font-size:12px}
+ .catalogTools{gap:5px}
+ .catalogTools select,.filterToggle{min-height:38px;padding:7px;font-size:11px}
+ .detailBody{padding:16px}
+ .productPage .productDetail{min-height:0}
+ .detailImg{min-height:230px;max-height:300px}
+ .detailBody h2,.productPage .detailBody h1{font-size:21px}
+ .bigPrice{font-size:26px}
+ .productActions{gap:7px}
+ .footerGrid{gap:18px 12px;padding:25px 4%}
+ .partnerRecognition{padding:15px 4%}
+ .sellerWorkspaceShop select{min-width:0}
+}
+@media(prefers-reduced-motion:reduce){
+ *,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
+}
