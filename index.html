@@ -21,6 +21,8 @@
     <div class="headActions">
       <button class="action hideMob" onclick="showAccount()">👤 <span>Account</span></button>
       <button class="action hideMob" onclick="showOrders()">📦 <span>Orders</span></button>
+      <button class="action sellAction" aria-label="Sell on Mbale Shopper" onclick="showSell()"><span aria-hidden="true">+</span><span>Sell</span></button>
+      <button class="action messagesAction" id="messagesButton" aria-label="Messages" onclick="showMessages()"><span aria-hidden="true">✉</span><span class="hideMob">Messages</span><b class="badge messageCountBadge" id="messageUnreadBadge" hidden>0</b></button>
       <button class="action cartBtn" onclick="toggleCart()">🛒 <span class="hideMob">Cart</span><b class="badge" id="cartCount">0</b></button>
     </div>
   </div>

@@ -132,12 +132,20 @@ const offers = {
   11:[["Bam Shopping Center",285000],["Republic Super Market",299000]],
   12:[["Mobile Hub Uganda",120000],["P & T ELECTRONICS MBALE",125000],["VIVA ELECTRONICS",132000]]
 };
-let cart=JSON.parse(localStorage.getItem("mbaleCart")||"[]"), wish=JSON.parse(localStorage.getItem("mbaleWish")||"[]"), recentlyViewed=JSON.parse(localStorage.getItem("mbaleRecentlyViewed")||"[]"), currentProduct=null, activeSearchSuggestion=-1, activeServiceCategory="all", selectedOfferIndexes={};
+let cart=JSON.parse(localStorage.getItem("mbaleCart")||"[]"), wish=JSON.parse(localStorage.getItem("mbaleWish")||"[]"), recentlyViewed=JSON.parse(localStorage.getItem("mbaleRecentlyViewed")||"[]"), chats=JSON.parse(localStorage.getItem("mbaleChats")||"[]"), currentProduct=null, activeSearchSuggestion=-1, activeServiceCategory="all", selectedOfferIndexes={}, activeChatId=null, activeChatFilter="all", chatSearchQuery="", isChatSelected=false;
+let sellerOrders=JSON.parse(localStorage.getItem("mbaleSellerOrders")||"[]"), sellerListings=JSON.parse(localStorage.getItem("mbaleSellerListings")||"[]"), sellerProductOverrides=JSON.parse(localStorage.getItem("mbaleSellerProductOverrides")||"{}"), sellerInventory=JSON.parse(localStorage.getItem("mbaleSellerInventory")||"{}"), sellerProfiles=JSON.parse(localStorage.getItem("mbaleSellerProfiles")||"{}"), sellerApplications=JSON.parse(localStorage.getItem("mbaleSellerApplications")||"[]"), activeSellerShop=localStorage.getItem("mbaleActiveSellerShop")||shops[0]?.name||products[0].shop, sellerSection="overview", activeSellerChatId=null;
+let sellerMessageFilter="all",sellerMessageSearch="";
+sellerListings.forEach(listing=>{if(!products.some(product=>product.id===listing.id))products.push(listing)});
+Object.entries(sellerProductOverrides).forEach(([id,overrides])=>{const product=products.find(item=>item.id===Number(id));if(product){Object.assign(product,overrides);productGalleryImages.set(product.id,[product.image])}});
+Object.entries(sellerInventory).forEach(([id,inventory])=>{if(Number(id)>0)demoInventory[Number(id)-1]=inventory});
 const spotlightTimers=new Map();
 const searchPromptExamples=[products[0].name,products[2].name,services[0].name,services[5].name,"Health & Pharmacy","Home & Kitchen"];
 
 const money=n=>"UGX "+Number(n).toLocaleString("en-UG");
 const el=id=>document.getElementById(id);
+const escapeHTML=value=>String(value).replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[char]));
+function getProductInventory(id){return sellerInventory[id]||demoInventory[Number(id)-1]||{stock:0,sold:0}}
+function saveSellerData(){localStorage.setItem("mbaleSellerOrders",JSON.stringify(sellerOrders));localStorage.setItem("mbaleSellerListings",JSON.stringify(sellerListings));localStorage.setItem("mbaleSellerProductOverrides",JSON.stringify(sellerProductOverrides));localStorage.setItem("mbaleSellerInventory",JSON.stringify(sellerInventory));localStorage.setItem("mbaleSellerProfiles",JSON.stringify(sellerProfiles));localStorage.setItem("mbaleSellerApplications",JSON.stringify(sellerApplications));localStorage.setItem("mbaleActiveSellerShop",activeSellerShop)}
 function getProductOffer(id,index=selectedOfferIndexes[id]||0){
  const product=products.find(item=>item.id===Number(id));
  const productOffers=offers[id]||[[product.shop,product.price]];
@@ -171,12 +179,13 @@ function changeDetailImage(button,direction){
 }
 function productCard(p){
  const liked=wish.includes(p.id);
- const inventory=demoInventory[p.id-1]||{stock:0,sold:0};
+ const inventory=getProductInventory(p.id);
  const outOfStock=inventory.stock===0;
  const images=productGalleryImages.get(p.id)||[p.image];
+ const productName=escapeHTML(p.name),sellerName=escapeHTML(p.shop),productTag=escapeHTML(p.tag),productDelivery=escapeHTML(p.delivery),imageUrl=escapeHTML(images[0]);
  return `<article class="card" onclick="openProduct(${p.id})">
- <div class="productImg"><img class="productGalleryImage" loading="lazy" data-product-id="${p.id}" data-image-index="0" src="${images[0]}" alt="${p.name}">${images.length>1?`<div class="galleryControls"><button type="button" aria-label="Previous image of ${p.name}" onclick="event.stopPropagation();changeCardImage(this,-1)">‹</button><span class="galleryCount">1 / ${images.length}</span><button type="button" aria-label="Next image of ${p.name}" onclick="event.stopPropagation();changeCardImage(this,1)">›</button></div>`:""}<span class="tag">${p.tag}</span><button class="cartQuick" aria-label="${outOfStock?"Out of stock: ":"Add to cart: "}${p.name}" title="${outOfStock?"Out of stock":"Add to cart"}" ${outOfStock?"disabled":""} onclick="event.stopPropagation();addToCart(${p.id})">🛒</button><button class="heart" aria-label="${liked?"Remove from":"Add to"} wishlist: ${p.name}" onclick="event.stopPropagation();toggleWish(${p.id})">${liked?"♥":"♡"}</button></div>
- <div class="cardBody"><div class="rating">★ ${p.rating} <span style="color:#98a2b3">(${p.reviews})</span></div><div class="title">${p.name}</div><div class="seller">Sold by ${p.shop}</div><div class="price">${money(p.price)} <span class="old">${money(p.old)}</span></div><div class="save">Save ${money(p.old-p.price)}</div><div class="inventoryMeta"><span class="stockStatus${outOfStock?" outOfStock":""}"><b>Stock:</b> ${outOfStock?"Out of stock":`${inventory.stock} available`}</span><span><b>Sold:</b> ${inventory.sold}</span></div><div class="delivery">✓ ${p.delivery}</div>${offers[p.id]?`<div class="compare"><span>Compare</span><strong>${offers[p.id].length} offers</strong></div>`:""}</div></article>`;
+ <div class="productImg"><img class="productGalleryImage" loading="lazy" data-product-id="${p.id}" data-image-index="0" src="${imageUrl}" alt="${productName}">${images.length>1?`<div class="galleryControls"><button type="button" aria-label="Previous image of ${productName}" onclick="event.stopPropagation();changeCardImage(this,-1)">‹</button><span class="galleryCount">1 / ${images.length}</span><button type="button" aria-label="Next image of ${productName}" onclick="event.stopPropagation();changeCardImage(this,1)">›</button></div>`:""}<span class="tag">${productTag}</span><button class="cartQuick" aria-label="${outOfStock?"Out of stock: ":"Add to cart: "}${productName}" title="${outOfStock?"Out of stock":"Add to cart"}" ${outOfStock?"disabled":""} onclick="event.stopPropagation();addToCart(${p.id})">🛒</button><button class="heart" aria-label="${liked?"Remove from":"Add to"} wishlist: ${productName}" onclick="event.stopPropagation();toggleWish(${p.id})">${liked?"♥":"♡"}</button></div>
+ <div class="cardBody"><div class="rating">★ ${p.rating} <span style="color:#98a2b3">(${p.reviews})</span></div><div class="title">${productName}</div><div class="seller">Sold by ${sellerName}</div><div class="price">${money(p.price)} <span class="old">${money(p.old)}</span></div><div class="save">Save ${money(p.old-p.price)}</div><div class="inventoryMeta"><span class="stockStatus${outOfStock?" outOfStock":""}"><b>Stock:</b> ${outOfStock?"Out of stock":`${inventory.stock} available`}</span><span><b>Sold:</b> ${inventory.sold}</span></div><div class="delivery">✓ ${productDelivery}</div>${offers[p.id]?`<div class="compare"><span>Compare</span><strong>${offers[p.id].length} offers</strong></div>`:""}</div></article>`;
 }
 function renderCategories(){
  el("categories").innerHTML=categories.map(category=>`<button class="cat" onclick="filterCategory('${category.value}')"><img loading="lazy" src="${img(category.image)}" alt=""><span>${category.label}</span></button>`).join("");
@@ -428,7 +437,7 @@ function renderPartners(){
  el("partnerShopList").innerHTML=shopList;
  el("deliveryPartnerList").innerHTML=deliveryList;
 }
-function initSellerFilter(){el("sellerFilter").innerHTML='<option value="all">All shops</option>'+shops.map(s=>`<option>${s.name}</option>`).join("")}
+function initSellerFilter(){const sellers=[...new Set([...shops.map(shop=>shop.name),...products.map(product=>product.shop)])].sort((a,b)=>a.localeCompare(b));el("sellerFilter").innerHTML='<option value="all">All shops</option>'+sellers.map(shop=>`<option>${escapeHTML(shop)}</option>`).join("")}
 let activeCatalogProductIds=null;
 function renderCatalog(){
  const q=el("searchInput").value.toLowerCase(), cat=el("searchCat").value, max=Number(el("priceRange").value), seller=el("sellerFilter").value;
@@ -469,6 +478,8 @@ function renderProductPage(p){
  const related=sameCategory.slice().sort((a,b)=>Number(b.name.split(" ")[0]===p.name.split(" ")[0])-Number(a.name.split(" ")[0]===p.name.split(" ")[0])||b.rating-a.rating).slice(0,10);
  const {picks,preferredCategory}=getRecommendedProducts(p.id);
  el("productPage").innerHTML=`<button class="productBack" type="button" onclick="closeProductPage()"><span aria-hidden="true">←</span> Back to shopping</button><div class="productDetail"><div class="detailImg"><img class="detailGalleryImage" data-product-id="${p.id}" data-image-index="0" src="${images[0]}" alt="${p.name}">${images.length>1?`<div class="detailGalleryControls"><button type="button" aria-label="Previous image of ${p.name}" onclick="changeDetailImage(this,-1)">‹</button><span class="detailGalleryCount">1 / ${images.length}</span><button type="button" aria-label="Next image of ${p.name}" onclick="changeDetailImage(this,1)">›</button></div>`:""}</div><div class="detailBody"><div class="rating">★ ${p.rating} • ${p.reviews} reviews</div><h1>${p.name}</h1><p class="productDescription">${p.desc}</p><div class="bigPrice">${money(p.price)} <span class="old">${money(p.old)}</span></div><div class="detailMeta"><span class="pill">✓ Mbale seller</span><span class="pill">↻ Return policy shown below</span><span class="pill">⚡ Local pickup/delivery</span></div><h3>Compare seller offers</h3>${os.map((o,i)=>`<div class="offer ${i===0?"best":""}"><div><b>${o[0]}</b><small>${i===0?"Lowest listed offer":"Alternative seller offer"} • Terms may vary</small></div><strong>${money(o[1])}</strong></div>`).join("")}<div class="productActions"><button class="yellowBtn" onclick="addToCart(${p.id})">Add to cart</button><button class="primary" onclick="buyNow(${p.id})">Buy now</button></div><div class="tabs"><span class="tab active" onclick="showTab('details')">Details</span><span class="tab" onclick="showTab('seller')">Seller</span><span class="tab" onclick="showTab('returns')">Returns</span><span class="tab" onclick="showTab('terms')">Terms</span></div><div id="tabPane" class="tabPane"><b>Product details</b><br>${p.desc}<br><br><b>Availability:</b> Seller stock must be confirmed before checkout.</div></div></div>${productShelfMarkup("sellerProductGrid","More from "+p.shop,"Browse other products from this seller.",sellerProducts)}${productShelfMarkup("customersViewedGrid","Customers also viewed","Popular products in this category.",customersViewed)}${productShelfMarkup("relatedProductGrid","Related products","More products from the same category.",related)}${productShelfMarkup("productPicksGrid","Top picks for you",preferredCategory?`Selected from your activity in ${preferredCategory.toLowerCase()}.`:"Popular picks from Mbale shoppers.",picks)}`;
+ const chatSeller=getProductOffer(p.id)[0];
+ el("productPage").querySelector(".productActions").insertAdjacentHTML("afterend",`<section class="sellerChat" aria-label="Chat with seller"><div class="sellerChatHeading"><div><h2>Chat with seller</h2><p>Ask <strong>${chatSeller}</strong> about this item</p></div><span class="sellerChatStatus">Seller</span></div><div class="sellerChatQuick" aria-label="Quick messages"><button type="button" onclick="setSellerQuickMessage('offer')">Make offer</button><button type="button" onclick="setSellerQuickMessage('available')">Is this available?</button><button type="button" onclick="setSellerQuickMessage('price')">Last price</button></div><label class="sellerChatLabel" for="sellerChatMessage">Message</label><textarea id="sellerChatMessage" placeholder="Write your message here"></textarea><button type="button" class="primary sellerChatStart" onclick="startSellerChat()">Start chat</button></section>`);
  initializeProductOffers(p);
  el("productPage").hidden=false;document.querySelector("main.container").classList.add("productView");window.scrollTo({top:0,behavior:"smooth"});
 }
@@ -490,6 +501,102 @@ function selectProductOffer(id,index){
   const selected=offerIndex===index;offerElement.classList.toggle("selected",selected);offerElement.setAttribute("aria-pressed",String(selected));
  });
  el("productPage").querySelector(".bigPrice").firstChild.textContent=money(productOffers[index][1])+" ";
+ const seller=el("productPage").querySelector(".sellerChatHeading p strong");
+ if(seller)seller.textContent=productOffers[index][0];
+}
+function setSellerQuickMessage(type){
+ if(!currentProduct)return;
+ const messages={offer:`Hi, would you consider a better price for ${currentProduct.name}?`,available:`Hi, is ${currentProduct.name} available?`,price:`Hi, what is your last price for ${currentProduct.name}?`};
+ const message=el("sellerChatMessage");
+ if(message){message.value=messages[type]||"";message.focus()}
+}
+function startSellerChat(){
+ const message=el("sellerChatMessage")?.value.trim();
+ if(!message){toast("Write a message to start chatting");return}
+ if(!currentProduct)return;
+ const [seller,price]=getProductOffer(currentProduct.id);
+ let chat=chats.find(item=>item.productId===currentProduct.id&&item.seller===seller);
+ if(!chat){chat={id:`chat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`,productId:currentProduct.id,seller,price,buyerName:"Shopper",messages:[],updatedAt:Date.now(),online:Math.random()<.6,lastSeenAt:Date.now()-Math.floor(Math.random()*3600000)};chats.push(chat)}
+ const sentMessage={text:message,from:"buyer",time:Date.now(),seen:false};
+ chat.messages.push(sentMessage);chat.updatedAt=Date.now();
+ activeChatId=chat.id;saveChats();showMessages(chat.id);simulateReadReceipt(chat.id,sentMessage.time);
+}
+function saveChats(){localStorage.setItem("mbaleChats",JSON.stringify(chats));updateMessageNotification()}
+function updateMessageNotification(){
+ const badge=el("messageUnreadBadge"),button=el("messagesButton");
+ if(!badge)return;
+ const unread=chats.reduce((total,chat)=>total+getChatUnreadCount(chat),0);
+ badge.textContent=unread>99?"99+":String(unread);
+ badge.hidden=unread===0;
+ if(button)button.setAttribute("aria-label",unread?`Messages, ${unread} unread replies`:"Messages");
+}
+function showMessages(chatId=null){
+ if(chatId){activeChatId=chatId;isChatSelected=true}else isChatSelected=false;
+ const activeChat=chats.find(chat=>chat.id===activeChatId);
+ if(activeChat){activeChat.messages.forEach(message=>{if(message.from==="seller")message.read=true});saveChats()}
+ renderMessagesModal();el("modalWrap").classList.add("show");
+}
+function renderMessagesModal(){
+ const orderedChats=[...chats].sort((a,b)=>b.updatedAt-a.updatedAt);
+ if(!orderedChats.some(chat=>chat.id===activeChatId))activeChatId=orderedChats[0]?.id||null;
+ const activeChat=chats.find(chat=>chat.id===activeChatId);
+ const activeProduct=activeChat&&products.find(product=>product.id===activeChat.productId);
+ el("modal").innerHTML=`<div class="messagesView" role="dialog" aria-label="Messages"><aside class="messagesSidebar"><div class="messagesSidebarHeader"><div><h2>Messages</h2><p>Your seller conversations</p></div><button class="messagesClose" type="button" aria-label="Close messages" onclick="closeModal()">×</button></div><div class="messagesList">${orderedChats.length?orderedChats.map(chat=>{const product=products.find(item=>item.id===chat.productId),lastMessage=chat.messages[chat.messages.length-1];return `<button class="messageListItem${chat.id===activeChatId?" active":""}" type="button" onclick="showMessages('${chat.id}')"><span class="messageAvatar" aria-hidden="true">${escapeHTML(chat.seller.slice(0,1).toUpperCase())}</span><span class="messageListCopy"><strong>${escapeHTML(chat.seller)}</strong><small>${escapeHTML(product?.name||"Product inquiry")}</small><span>${escapeHTML(lastMessage?.text||"")}</span></span></button>`}).join(""):`<p class="messageListEmpty">No conversations yet</p>`}</div></aside><section class="messageThread">${activeChat?`<header class="messageThreadHeader"><span class="messageAvatar" aria-hidden="true">${escapeHTML(activeChat.seller.slice(0,1).toUpperCase())}</span><div><strong>${escapeHTML(activeChat.seller)}</strong><small>${escapeHTML(activeProduct?.name||"Product inquiry")}</small></div></header><div class="messageHistory" id="messageHistory">${activeChat.messages.map(message=>`<div class="messageRow ${message.from==="buyer"?"buyerMessage":"sellerMessage"}"><div class="messageBubble">${escapeHTML(message.text)}<time>${new Date(message.time).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}</time></div></div>`).join("")}</div><form class="messageComposer" onsubmit="sendChatMessage(event)"><textarea id="chatComposer" rows="1" maxlength="2000" aria-label="Write a message" placeholder="Write a message"></textarea><button class="primary" type="submit">Send</button></form><p class="messagesNote">Demo chat is saved in this browser. Seller replies are not connected.</p>`:`<div class="messageEmpty"><strong>Your messages</strong><p>Start a chat from a product page to ask a seller about an item.</p></div>`}</section></div>`;
+ const messagesView=el("modal").querySelector(".messagesView");
+ messagesView.classList.toggle("chatSelected",isChatSelected);
+ setupMessageControls();renderMessageList();
+ const threadHeader=el("modal").querySelector(".messageThreadHeader");
+ if(threadHeader)threadHeader.insertAdjacentHTML("afterbegin",`<button class="messagesBack" type="button" aria-label="Back to conversations" onclick="showMessages()">‹</button>`);
+ if(threadHeader&&activeChat){const detail=threadHeader.querySelector("div"),presence=document.createElement("small");presence.className=`messagePresence${activeChat.online?" online":""}`;presence.textContent=getChatPresenceLabel(activeChat);detail.append(presence)}
+ const messageNote=el("modal").querySelector(".messagesNote");
+ if(messageNote)messageNote.textContent="Demo chat is saved here. Seller presence and read receipts are simulated.";
+ const history=el("messageHistory");
+ if(history&&activeChat&&activeProduct){const matchingOffer=(offers[activeProduct.id]||[[activeProduct.shop,activeProduct.price]]).find(([seller])=>seller===activeChat.seller),chatPrice=activeChat.price??matchingOffer?.[1]??activeProduct.price;history.insertAdjacentHTML("beforebegin",`<div class="chatProductContext"><img src="${activeProduct.image}" alt=""><span class="chatProductInfo"><small>ITEM IN THIS CHAT</small><strong>${escapeHTML(activeProduct.name)}</strong><span>${escapeHTML(activeChat.seller)} · ${money(chatPrice)}</span></span><button type="button" onclick="closeModal();openProduct(${activeProduct.id})">View item</button></div>`)}
+ if(history&&activeChat){activeChat.messages.forEach((message,index)=>{if(message.from!=="buyer")return;const time=history.children[index]?.querySelector("time");if(!time)return;const receipt=document.createElement("span");receipt.className=`messageReceipt${message.seen?" seen":""}`;receipt.setAttribute("aria-label",message.seen?"Seen":"Sent");receipt.textContent="✓✓";time.append(receipt)})}
+ if(history)history.scrollTop=history.scrollHeight;
+ const composer=el("chatComposer");
+ if(composer)composer.addEventListener("keydown",event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();composer.form.requestSubmit()}});
+}
+function setupMessageControls(){
+ const sidebar=el("modal").querySelector(".messagesSidebar");
+ if(!sidebar||sidebar.querySelector(".messagesTools"))return;
+ sidebar.querySelector(".messagesList").insertAdjacentHTML("beforebegin",`<div class="messagesTools"><label class="messageSearch"><span aria-hidden="true">⌕</span><input type="search" aria-label="Search conversations" placeholder="Search chats" value="${escapeHTML(chatSearchQuery)}" oninput="updateMessageSearch(this.value)"></label><div class="messagesFilters" role="group" aria-label="Filter conversations"><button type="button" class="messageFilterBtn" data-filter="all" onclick="updateMessageFilter('all')">All <span class="allChatCount"></span></button><button type="button" class="messageFilterBtn" data-filter="unread" onclick="updateMessageFilter('unread')">Unread <span class="unreadChatCount"></span></button></div></div>`);
+}
+function getChatUnreadCount(chat){return chat.messages.filter(message=>message.from==="seller"&&!message.read).length}
+function getChatPresenceLabel(chat){
+ if(chat.online)return "Online";
+ const elapsedMinutes=Math.max(1,Math.floor((Date.now()-(chat.lastSeenAt||chat.updatedAt||Date.now()))/60000));
+ if(elapsedMinutes<60)return `Last seen ${elapsedMinutes} min ago`;
+ const elapsedHours=Math.floor(elapsedMinutes/60);
+ return elapsedHours<24?`Last seen ${elapsedHours} hr ago`:`Last seen ${Math.floor(elapsedHours/24)} d ago`;
+}
+function getChatLastSeenDetails(chat){
+ if(chat.online)return "Online";
+ const lastSeen=new Date(chat.lastSeenAt||chat.updatedAt||Date.now()),date=lastSeen.toLocaleDateString("en-UG",{day:"numeric",month:"short",year:"numeric"}),time=lastSeen.toLocaleTimeString("en-UG",{hour:"numeric",minute:"2-digit"});
+ return `Last seen ${date} · ${time}`;
+}
+function renderMessageList(){
+ const list=el("modal").querySelector(".messagesList");if(!list)return;
+ const orderedChats=[...chats].sort((a,b)=>b.updatedAt-a.updatedAt);
+ const search=chatSearchQuery.trim().toLowerCase();
+ const visibleChats=orderedChats.filter(chat=>(activeChatFilter!=="unread"||getChatUnreadCount(chat)>0)&&(!search||chat.seller.toLowerCase().includes(search)));
+ list.innerHTML=visibleChats.length?visibleChats.map(chat=>{const count=chat.messages.length,unread=getChatUnreadCount(chat),lastBuyerMessage=chat.messages.slice().reverse().find(message=>message.from==="buyer"),receipt=lastBuyerMessage?`<span class="messageListReceipt${lastBuyerMessage.seen?" seen":""}" aria-label="${lastBuyerMessage.seen?"Seen":"Sent"}" title="${lastBuyerMessage.seen?"Seen":"Sent"}">✓✓</span>`:"";return `<button class="messageListItem${chat.id===activeChatId?" active":""}" type="button" onclick="showMessages('${escapeHTML(chat.id)}')"><span class="messageAvatar" aria-hidden="true">${escapeHTML(chat.seller.slice(0,1).toUpperCase())}</span><span class="messageListCopy"><strong>${escapeHTML(chat.seller)}</strong>${receipt}<small class="messageListPresence${chat.online?" online":""}">${getChatLastSeenDetails(chat)}</small></span><span class="messageCount" aria-label="${count} messages">${count}</span>${unread?`<span class="messageUnreadCount" aria-label="${unread} unread messages">${unread}</span>`:""}</button>`}).join(""):`<p class="messageListEmpty">${search?"No matching chats":activeChatFilter==="unread"?"No unread messages":"No conversations yet"}</p>`;
+ el("modal").querySelectorAll(".messageFilterBtn").forEach(button=>button.classList.toggle("active",button.dataset.filter===activeChatFilter));
+ const allCount=el("modal").querySelector(".allChatCount"),unreadCount=el("modal").querySelector(".unreadChatCount");
+ if(allCount)allCount.textContent=chats.length;
+ if(unreadCount)unreadCount.textContent=chats.reduce((total,chat)=>total+getChatUnreadCount(chat),0);
+}
+function updateMessageSearch(value){chatSearchQuery=value;renderMessageList()}
+function updateMessageFilter(filter){activeChatFilter=filter;renderMessageList()}
+function simulateReadReceipt(chatId,messageTime){
+ setTimeout(()=>{const chat=chats.find(item=>item.id===chatId),message=chat?.messages.find(item=>item.time===messageTime&&item.from==="buyer");if(!chat||!message)return;message.seen=true;saveChats();if(activeChatId===chatId&&el("modalWrap").classList.contains("show"))renderMessagesModal()},1600);
+}
+function sendChatMessage(event){
+ event.preventDefault();
+ const chat=chats.find(item=>item.id===activeChatId),input=el("chatComposer"),text=input?.value.trim();
+ if(!chat||!text)return;
+ const sentMessage={text,from:"buyer",time:Date.now(),seen:false};
+ chat.messages.push(sentMessage);chat.updatedAt=Date.now();saveChats();renderMessagesModal();el("chatComposer")?.focus();simulateReadReceipt(chat.id,sentMessage.time);
 }
 function openProduct(id,fromHistory=false){
  const product=products.find(item=>item.id===Number(id));if(!product)return;
@@ -515,12 +622,12 @@ function showTab(t){
 }
 function closeModal(){el("modalWrap").classList.remove("show")}
 function addToCart(id,offerIndex=selectedOfferIndexes[id]||0){
- if(demoInventory[id-1]?.stock===0){toast("This item is out of stock");return}
+ if(getProductInventory(id).stock===0){toast("This item is out of stock");return}
  const product=products.find(item=>item.id===id),[seller,price]=getProductOffer(id,offerIndex),found=cart.find(item=>item.id===id&&(item.seller||product.shop)===seller&&Number(item.price??product.price)===price);
  if(found)found.qty++;else cart.push({id,qty:1,seller,price});
  save();renderRecommendations();renderCart();toast(`Added from ${seller}`);
 }
-function buyNow(id,offerIndex=selectedOfferIndexes[id]||0){if(demoInventory[id-1]?.stock===0){toast("This item is out of stock");return}addToCart(id,offerIndex);closeModal();toggleCart()}
+function buyNow(id,offerIndex=selectedOfferIndexes[id]||0){if(getProductInventory(id).stock===0){toast("This item is out of stock");return}addToCart(id,offerIndex);closeModal();toggleCart()}
 function toggleCart(){el("cartDrawer").classList.toggle("show");renderCart()}
 function renderCart(){
  const box=el("cartItems");if(!cart.length){box.innerHTML='<div class="empty" style="margin-top:20px">Your cart is empty.<br><button class="primary" style="margin-top:12px" onclick="toggleCart();document.getElementById(\'catalog\').scrollIntoView()">Start shopping</button></div>';el("cartTotal").textContent="UGX 0";return}
@@ -533,14 +640,205 @@ function checkout(){
  el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>Checkout</h2><p style="color:#667085">Review your delivery details and choose a payment method. This demo does not process real payments.</p><div class="formGrid"><div><label>Full name<input placeholder="Your name"></label></div><div><label>Phone number<input placeholder="+256 ..."></label></div><div class="full"><label>Delivery address<textarea placeholder="Area, street, landmark, Mbale"></textarea></label></div><div><label>Delivery method<select><option>Seller delivery</option><option>Pickup from shop</option></select></label></div><div><label>Payment method<select><option>Mobile Money</option><option>Cash on delivery</option><option>Card</option></select></label></div></div><div style="background:#f8fafc;padding:14px;border-radius:9px;margin:18px 0"><b>Order total: ${money(total)}</b><br><small style="color:#667085">Delivery fees and seller terms are confirmed before final order placement.</small></div><button class="yellowBtn" style="width:100%" onclick="placeOrder()">Place demo order</button></div>`;
  el("modalWrap").classList.add("show");el("cartDrawer").classList.remove("show");
 }
-function placeOrder(){cart=[];save();closeModal();toast("Demo order placed successfully");}
+function placeOrder(){
+ const inputs=el("modal").querySelectorAll(".formGrid input"),address=el("modal").querySelector(".formGrid textarea")?.value.trim(),customerName=inputs[0]?.value.trim(),phone=inputs[1]?.value.trim(),phoneDigits=phone?.replace(/\D/g,"")||"";
+ if(!customerName||!phone||!address){toast("Enter your name, phone number and delivery address");return}
+ if(phoneDigits.length<9||phoneDigits.length>15){toast("Enter a valid phone number");return}
+ const quantities=new Map();cart.forEach(item=>quantities.set(item.id,(quantities.get(item.id)||0)+item.qty));
+ for(const [productId,quantity] of quantities){if(getProductInventory(productId).stock<quantity){toast(`${products.find(product=>product.id===productId)?.name||"Item"} no longer has enough stock`);return}}
+ const selects=el("modal").querySelectorAll(".formGrid select"),orderGroup=`MS-${Date.now().toString(36).toUpperCase()}`;
+ cart.forEach((item,index)=>{
+  const product=products.find(entry=>entry.id===item.id),price=Number(item.price??product.price),seller=item.seller||product.shop;
+  sellerOrders.unshift({id:`${orderGroup}-${String(index+1).padStart(2,"0")}`,checkoutId:orderGroup,seller,productId:item.id,productName:product.name,quantity:item.qty,unitPrice:price,total:price*item.qty,customerName,phone,address,deliveryMethod:selects[0]?.value||"Seller delivery",paymentMethod:selects[1]?.value||"Mobile Money",paymentStatus:"Awaiting payment",status:"New",createdAt:Date.now()});
+ });
+ quantities.forEach((quantity,id)=>{const inventory=getProductInventory(id);sellerInventory[id]={stock:inventory.stock-quantity,sold:inventory.sold+quantity}});
+ saveSellerData();cart=[];save();renderCart();renderCatalog();closeModal();toast("Demo order recorded; payment is still pending");
+}
 function showPolicy(type){
  const data={terms:["Terms & conditions","Mbale Shopper is a marketplace interface connecting shoppers with participating sellers. Sellers control their own inventory, product information, fulfilment and seller-specific warranties. Buyers should review the seller and product terms before confirming payment."],returns:["Returns & refunds","Return eligibility, timelines and conditions should be displayed by each seller and category. Items generally need to be unused, undamaged and in original packaging where applicable. Refund timing depends on the selected payment method and seller verification."],privacy:["Privacy policy","This front-end demo stores cart and wishlist data locally in your browser. A production implementation should add secure authentication, encrypted payment processing, consent controls, order records and a formal privacy policy."]};
  el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>${data[type][0]}</h2><p style="line-height:1.8;color:#475467">${data[type][1]}</p></div>`;el("modalWrap").classList.add("show");
 }
 function showAccount(){el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>My account</h2><p>Sign in or create an account to manage orders, addresses, wishlist and seller messages.</p><div class="formGrid"><label>Email / phone<input placeholder="Email or phone"></label><label>Password<input type="password" placeholder="Password"></label></div><button class="yellowBtn" style="margin-top:16px;width:100%" onclick="toast('Demo sign-in');closeModal()">Sign in</button></div>`;el("modalWrap").classList.add("show")}
 function showOrders(){el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>Your orders</h2><div class="empty">No orders yet.<br>Orders you place will appear here.</div></div>`;el("modalWrap").classList.add("show")}
-function showSell(){el("modal").innerHTML=`<button class="close" onclick="closeModal()">✕</button><div class="form"><h2>Sell on Mbale Shopper</h2><p>List your shop and products so local customers can compare your offers.</p><div class="formGrid"><label>Business name<input placeholder="Shop name"></label><label>Contact phone<input placeholder="+256 ..."></label><label>Business category<select><option>Electronics</option><option>Fashion</option><option>Grocery</option><option>Home</option><option>Other</option></select></label><label>Location<input placeholder="Mbale area / landmark"></label><label class="full">Business description<textarea placeholder="Tell shoppers about your store"></textarea></label></div><button class="yellowBtn" style="margin-top:16px" onclick="toast('Seller application saved in demo');closeModal()">Submit seller application</button></div>`;el("modalWrap").classList.add("show")}
+function sellerProductsFor(shop=activeSellerShop){return products.filter(product=>product.shop===shop)}
+function sellerOrdersFor(shop=activeSellerShop){return sellerOrders.filter(order=>order.seller===shop)}
+function sellerChatsFor(shop=activeSellerShop){return chats.filter(chat=>chat.seller===shop)}
+function sellerUnreadCount(chat){return chat.messages.filter(message=>message.from==="buyer"&&!message.read).length}
+function getSellerProfile(shop=activeSellerShop){const saved=sellerProfiles[shop]||{},store=shops.find(item=>item.name===shop);return {phone:"",email:"",location:"Mbale, Uganda",hours:"Mon-Sat, 9:00 AM-6:00 PM",description:store?.desc||"Local seller on Mbale Shopper",...saved}}
+function showSell(){renderSellerCenter("overview")}
+function renderSellerCenter(section=sellerSection){
+ sellerSection=section;
+ const shopNames=[...new Set([...shops.map(shop=>shop.name),...products.map(product=>product.shop)])].sort((a,b)=>a.localeCompare(b));
+ if(!shopNames.includes(activeSellerShop))activeSellerShop=shopNames[0];
+ const sections=[["overview","Overview"],["products","Products"],["orders","Orders"],["messages","Messages"],["profile","Shop profile"],["payments","Payments"],["verification","Verification"],["support","Support"],["application","Application"]];
+ el("modal").innerHTML=`<div class="sellerWorkspace" role="dialog" aria-label="Seller center"><header class="sellerWorkspaceHeader"><div><span class="sellerEyebrow">MBALE SHOPPER</span><h1>Seller center</h1></div><label class="sellerWorkspaceShop">Demo shop<select aria-label="Select demo shop" onchange="switchSellerShop(this.value)">${shopNames.map(shop=>`<option value="${escapeHTML(shop)}"${shop===activeSellerShop?" selected":""}>${escapeHTML(shop)}</option>`).join("")}</select></label><button class="messagesClose" type="button" aria-label="Close seller center" onclick="closeModal()">×</button></header><div class="sellerWorkspaceLayout"><nav class="sellerWorkspaceNav" aria-label="Seller sections">${sections.map(([key,label])=>`<button type="button" class="sellerNavButton${sellerSection===key?" active":""}" onclick="renderSellerCenter('${key}')">${label}${key==="messages"&&sellerChatsFor().reduce((sum,chat)=>sum+sellerUnreadCount(chat),0)?`<span>${sellerChatsFor().reduce((sum,chat)=>sum+sellerUnreadCount(chat),0)}</span>`:""}</button>`).join("")}</nav><main class="sellerWorkspaceContent" id="sellerWorkspaceContent"></main></div><footer class="sellerWorkspaceFooter"><span>Local demo workspace · Changes are stored in this browser only</span><span>Production requires authenticated seller accounts and server-side data</span></footer></div>`;
+ el("modalWrap").classList.add("show");renderSellerSection();
+}
+function switchSellerShop(shop){activeSellerShop=shop;activeSellerChatId=null;saveSellerData();renderSellerCenter(sellerSection)}
+function renderSellerSection(){
+ const content=el("sellerWorkspaceContent");if(!content)return;
+ const renderers={overview:renderSellerOverview,products:renderSellerProducts,orders:renderSellerOrders,messages:renderSellerMessages,profile:renderSellerProfile,payments:renderSellerPayments,verification:renderSellerVerification,support:renderSellerSupport,application:renderSellerApplication};
+ content.innerHTML=(renderers[sellerSection]||renderSellerOverview)();
+ if(sellerSection==="messages"){
+  const threadHeader=content.querySelector(".messageThreadHeader"),itemContext=content.querySelector(".chatProductContext");
+  if(threadHeader&&itemContext){
+    const profile=document.createElement("div"),profileAvatar=threadHeader.querySelector(".messageAvatar"),profileName=threadHeader.querySelector("div strong"),itemDetails=document.createElement("div"),itemImage=itemContext.querySelector("img"),itemInfo=itemContext.querySelector(".chatProductInfo"),itemTitle=itemInfo.querySelector("strong"),itemPrice=itemInfo.querySelector("span");
+    if(itemPrice)itemPrice.textContent=itemPrice.textContent.split("·").pop().trim();
+    itemTitle.className="sellerChatHeaderItemName";itemPrice.className="sellerChatHeaderItemPrice";
+   profile.className="sellerChatHeaderProfile";profile.setAttribute("aria-label","Shopper profile");profile.append(profileAvatar,profileName);
+     itemDetails.className="sellerChatHeaderItem";itemDetails.append(itemImage,itemTitle,itemPrice);
+   threadHeader.replaceChildren(profile,itemDetails);itemContext.remove();
+  }
+  syncSellerInboxNames();
+  const sellerHistory=content.querySelector("#sellerMessageHistory");
+  if(sellerHistory)sellerHistory.scrollTop=sellerHistory.scrollHeight;
+  const composer=el("sellerReplyInput");
+  if(composer)composer.addEventListener("keydown",event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();composer.form.requestSubmit()}});
+ }
+ syncSellerMessageCount();
+}
+function syncSellerInboxNames(){
+ const ordered=sellerChatsFor().slice().sort((a,b)=>b.updatedAt-a.updatedAt);
+ const list=el("modal").querySelector(".sellerInboxList");if(!list)return;
+ if(!list.querySelector(".sellerInboxTools"))list.insertAdjacentHTML("afterbegin",`<div class="sellerInboxTools"><label><span aria-hidden="true">⌕</span><input type="search" aria-label="Search seller conversations" placeholder="Search buyer or item" value="${escapeHTML(sellerMessageSearch)}" oninput="updateSellerInboxSearch(this.value)"></label><div class="sellerInboxFilters" role="group" aria-label="Filter by message status"><button type="button" data-filter="all" onclick="updateSellerInboxFilter('all')">All <span></span></button><button type="button" data-filter="unread" onclick="updateSellerInboxFilter('unread')">Unread <span></span></button><button type="button" data-filter="seen" onclick="updateSellerInboxFilter('seen')">Seen <span></span></button><button type="button" data-filter="sent" onclick="updateSellerInboxFilter('sent')">Sent <span></span></button></div></div>`);
+ list.querySelectorAll(".sellerInboxItem").forEach((item,index)=>{
+  const chat=ordered[index];if(!chat)return;
+  const product=products.find(entry=>entry.id===chat.productId),status=getSellerChatStatus(chat),buyerName=chat.buyerName||"Shopper";
+  item.innerHTML=`<span class="sellerInboxAvatar" aria-hidden="true">👤</span><span class="sellerInboxIdentity"><span class="sellerInboxIdentityLine"><strong>${escapeHTML(buyerName)}</strong><span class="sellerConversationStatus ${status.key}" aria-label="${escapeHTML(status.label)}">${status.hasReceipt?`<span class="sellerReceiptTicks${status.key==="seen"?" seen":""}" aria-hidden="true">✓✓</span>`:""}${status.count?`<span class="sellerUnreadBadge" aria-label="${status.count} unread messages">${status.count}</span>`:""}${escapeHTML(status.label)}</span></span><small class="sellerInboxLastSeen">${escapeHTML(getChatLastSeenDetails(chat))}</small></span>`;
+  item.dataset.messageStatus=status.key;
+  item.dataset.searchText=`${chat.buyerName||"Shopper"} ${product?.name||""}`.toLowerCase();
+ });
+ renderSellerInboxFilters();
+ const active=ordered.find(chat=>chat.id===activeSellerChatId),threadLabel=el("modal").querySelector(".sellerInboxThread>header strong");
+ if(active&&threadLabel)threadLabel.textContent=active.buyerName||"Shopper";
+}
+function getSellerChatStatus(chat){
+ const unread=sellerUnreadCount(chat);
+ if(unread)return {key:"unread",label:"Unread",count:unread,hasReceipt:false};
+ const latestSellerMessage=chat.messages.slice().reverse().find(message=>message.from==="seller");
+ if(latestSellerMessage)return latestSellerMessage.read?{key:"seen",label:"Seen",hasReceipt:true}:{key:"sent",label:"Sent",hasReceipt:true};
+ const latestBuyerMessage=chat.messages.slice().reverse().find(message=>message.from==="buyer");
+ if(latestBuyerMessage)return latestBuyerMessage.read?{key:"seen",label:"Read",hasReceipt:false}:{key:"unread",label:"Unread",count:1,hasReceipt:false};
+ return {key:"sent",label:"No messages",hasReceipt:false};
+}
+function renderSellerInboxFilters(){
+ const list=el("modal").querySelector(".sellerInboxList");if(!list)return;
+ const chatsForShop=sellerChatsFor().slice().sort((a,b)=>b.updatedAt-a.updatedAt),search=sellerMessageSearch.trim().toLowerCase();
+ const buttons=list.querySelectorAll(".sellerInboxFilters button");
+ buttons.forEach(button=>{
+  const key=button.dataset.filter,count=key==="all"?chatsForShop.length:chatsForShop.filter(chat=>getSellerChatStatus(chat).key===key).length;
+  button.classList.toggle("active",key===sellerMessageFilter);button.querySelector("span").textContent=count;
+ });
+ let shown=0;
+ list.querySelectorAll(".sellerInboxItem").forEach(item=>{
+  const matchesFilter=sellerMessageFilter==="all"||item.dataset.messageStatus===sellerMessageFilter,matchesSearch=!search||item.dataset.searchText.includes(search);
+  item.hidden=!(matchesFilter&&matchesSearch);if(!item.hidden)shown++;
+ });
+ let empty=list.querySelector(".sellerInboxFilterEmpty");
+ if(!empty){empty=document.createElement("p");empty.className="sellerInboxFilterEmpty sellerInlineNote";list.append(empty)}
+ empty.hidden=shown>0||!list.querySelector(".sellerInboxItem");
+ empty.textContent=search?"No conversations match your search.":sellerMessageFilter==="all"?"No buyer conversations for this shop yet.":`No ${sellerMessageFilter} conversations.`;
+}
+function updateSellerInboxSearch(value){sellerMessageSearch=value;renderSellerInboxFilters()}
+function updateSellerInboxFilter(filter){sellerMessageFilter=filter;renderSellerInboxFilters()}
+function syncSellerMessageCount(){
+ const button=[...el("modal").querySelectorAll(".sellerNavButton")].find(item=>item.textContent.startsWith("Messages"));
+ if(!button)return;
+ const unread=sellerChatsFor().reduce((sum,chat)=>sum+sellerUnreadCount(chat),0),badge=button.querySelector("span");
+ if(unread){if(badge)badge.textContent=unread;else{const count=document.createElement("span");count.textContent=unread;button.append(count)}}else badge?.remove();
+}
+function sellerPageHeading(title,description,action=""){return `<div class="sellerPageHeading"><div><h2>${title}</h2><p>${description}</p></div>${action}</div>`}
+function renderSellerOverview(){
+ const items=sellerProductsFor(),orders=sellerOrdersFor(),openOrders=orders.filter(order=>!["Completed","Cancelled"].includes(order.status)),lowStock=items.filter(product=>getProductInventory(product.id).stock<=5),unread=sellerChatsFor().reduce((sum,chat)=>sum+sellerUnreadCount(chat),0),sales=orders.reduce((sum,order)=>sum+Number(order.total||0),0);
+ return `${sellerPageHeading("Overview",`Daily operations for ${escapeHTML(activeSellerShop)}.`)}<div class="sellerWorkspaceNotice"><strong>Demo data only.</strong> This workspace runs locally; orders, messages and changes are not synced to other devices.</div><div class="sellerMetricGrid"><article><span>Active listings</span><strong>${items.length}</strong><small>${lowStock.length} low or out of stock</small></article><article><span>Open orders</span><strong>${openOrders.length}</strong><small>Needs fulfilment attention</small></article><article><span>Unread buyer messages</span><strong>${unread}</strong><small>Across seller conversations</small></article><article><span>Order value</span><strong>${money(sales)}</strong><small>Demo orders recorded</small></article></div><section class="sellerOverviewSection"><div class="sellerSubheading"><h3>Recent orders</h3><button type="button" onclick="renderSellerCenter('orders')">View orders</button></div>${sellerOrderTableMarkup(orders.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,5),false)}</section><section class="sellerOverviewSection"><div class="sellerSubheading"><h3>Stock to review</h3><button type="button" onclick="renderSellerCenter('products')">Manage products</button></div>${lowStock.length?`<ul class="sellerAttentionList">${lowStock.slice(0,5).map(product=>`<li><span>${escapeHTML(product.name)}</span><b>${getProductInventory(product.id).stock===0?"Out of stock":`${getProductInventory(product.id).stock} left`}</b></li>`).join("")}</ul>`:`<p class="sellerInlineNote">No low-stock listings right now.</p>`}</section>`;
+}
+function sellerOrderTableMarkup(orders,editable=true){
+ if(!orders.length)return `<div class="sellerEmptyState"><strong>No orders yet</strong><p>New orders for this shop will appear here.</p></div>`;
+ return `<div class="sellerTableWrap"><table class="sellerTable"><thead><tr><th>Order</th><th>Item</th><th>Buyer</th><th>Total</th><th>Status</th></tr></thead><tbody>${orders.map(order=>`<tr><td><strong>${escapeHTML(order.id)}</strong><small>${new Date(order.createdAt).toLocaleDateString()}</small></td><td>${escapeHTML(order.productName)}<small>Qty ${order.quantity}</small></td><td>${escapeHTML(order.customerName||"Shopper")}</td><td>${money(order.total)}</td><td>${editable?`<select aria-label="Order status ${escapeHTML(order.id)}" onchange="updateSellerOrderStatus('${escapeHTML(order.id)}',this.value)">${["New","Confirmed","Preparing","Ready for pickup","Completed","Cancelled"].map(status=>`<option${order.status===status?" selected":""}>${status}</option>`).join("")}</select>`:`<span class="sellerStatus ${escapeHTML((order.status||"New").toLowerCase().replaceAll(" ","-"))}">${escapeHTML(order.status||"New")}</span>`}</td></tr>`).join("")}</tbody></table></div>`;
+}
+function renderSellerProducts(){
+ const items=sellerProductsFor().slice().sort((a,b)=>a.name.localeCompare(b.name));
+ return `${sellerPageHeading("Products", "Manage marketplace listings, prices and stock.", `<button class="primary sellerPageAction" type="button" onclick="renderSellerProductForm()">+ Add listing</button>`)}<div class="sellerWorkspaceNotice">Price and stock changes update this browser’s shopper catalog. Public listings require server-side moderation and inventory sync in production.</div>${items.length?`<div class="sellerTableWrap"><table class="sellerTable"><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Listing</th><th></th></tr></thead><tbody>${items.map(product=>{const stock=getProductInventory(product.id).stock;return `<tr><td class="sellerProductCell"><img src="${product.image}" alt=""><span><strong>${escapeHTML(product.name)}</strong><small>ID ${product.id}</small></span></td><td>${escapeHTML(product.cat)}</td><td>${money(product.price)}</td><td>${stock}</td><td><span class="sellerStatus ${stock?"active":"out-of-stock"}">${stock?"Active":"Out of stock"}</span></td><td><button class="sellerTableAction" type="button" onclick="renderSellerProductForm(${product.id})">Edit</button></td></tr>`}).join("")}</tbody></table></div>`:`<div class="sellerEmptyState"><strong>No products listed</strong><p>Add your first item to the demo marketplace.</p><button class="primary" onclick="renderSellerProductForm()">Add listing</button></div>`}`;
+}
+function renderSellerOrders(){
+ const orders=sellerOrdersFor().slice().sort((a,b)=>b.createdAt-a.createdAt);
+ return `${sellerPageHeading("Orders", "Confirm, prepare and update buyer orders.")}<div class="sellerWorkspaceNotice">Order status changes are recorded locally. Payment capture, buyer notifications and delivery tracking need connected services.</div>${sellerOrderTableMarkup(orders)}`;
+}
+function renderSellerMessages(){
+ const sellerChats=sellerChatsFor().slice().sort((a,b)=>b.updatedAt-a.updatedAt);
+ if(!sellerChats.some(chat=>chat.id===activeSellerChatId))activeSellerChatId=sellerChats[0]?.id||null;
+ const activeChat=sellerChats.find(chat=>chat.id===activeSellerChatId),product=activeChat&&products.find(item=>item.id===activeChat.productId);
+ if(activeChat)activeChat.messages.forEach(message=>{if(message.from==="buyer")message.read=true});
+ if(activeChat)saveChats();
+ const productOffer=product&&(offers[product.id]||[[product.shop,product.price]]).find(([seller])=>seller===activeChat.seller),chatPrice=activeChat?.price??productOffer?.[1]??product?.price;
+ return `<div class="sellerInbox"><aside class="sellerInboxList">${sellerChats.length?sellerChats.map(chat=>`<button type="button" class="sellerInboxItem${activeChat?.id===chat.id?" active":""}" onclick="selectSellerChat('${escapeHTML(chat.id)}')"><strong>${escapeHTML(chat.seller)}</strong><small>${escapeHTML(products.find(item=>item.id===chat.productId)?.name||"Product enquiry")}</small><span>${chat.messages.length} messages${sellerUnreadCount(chat)?` · ${sellerUnreadCount(chat)} unread`:""}</span></button>`).join(""):`<p class="sellerInlineNote">No buyer conversations for this shop yet.</p>`}</aside><section class="sellerInboxThread messageThread">${activeChat?`<header class="messageThreadHeader"><span class="messageAvatar" aria-hidden="true">${escapeHTML((activeChat.buyerName||"Shopper").slice(0,1).toUpperCase())}</span><div><strong>${escapeHTML(activeChat.buyerName||"Shopper")}</strong><small>${escapeHTML(product?.name||"Product enquiry")}</small><small class="messagePresence">Buyer</small></div></header><div class="chatProductContext"><img src="${escapeHTML(product?.image||"")}" alt=""><span class="chatProductInfo"><small>ITEM IN THIS CHAT</small><strong>${escapeHTML(product?.name||"Product enquiry")}</strong><span>${escapeHTML(activeChat.seller)} · ${money(chatPrice||0)}</span></span></div><div class="messageHistory sellerInboxHistory" id="sellerMessageHistory">${activeChat.messages.map(message=>`<div class="messageRow ${message.from==="seller"?"buyerMessage":"sellerMessage"}"><div class="messageBubble">${escapeHTML(message.text)}<time>${new Date(message.time).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}${message.from==="seller"?`<span class="messageReceipt${message.read?" seen":""}" aria-label="${message.read?"Seen":"Sent"}">✓✓</span>`:""}</time></div></div>`).join("")}</div><form class="messageComposer sellerReplyForm" onsubmit="sendSellerReply(event)"><textarea id="sellerReplyInput" name="reply" rows="1" required maxlength="2000" placeholder="Write a reply" aria-label="Write a reply"></textarea><button class="primary" type="submit">Send</button></form><p class="messagesNote">Seller replies are saved locally; live delivery is not connected.</p>`:`<div class="sellerEmptyState"><strong>Select a conversation</strong><p>Buyer messages for this shop will appear here.</p></div>`}</section></div>`;
+}
+function renderSellerProfile(){
+ const profile=getSellerProfile();
+ return `${sellerPageHeading("Shop profile", "Keep your public shop details accurate and useful.")}<form class="sellerProfileForm" onsubmit="saveSellerProfile(event)"><label>Shop name<input value="${escapeHTML(activeSellerShop)}" readonly></label><label>Contact phone<input name="phone" type="tel" autocomplete="tel" value="${escapeHTML(profile.phone)}" placeholder="+256 7XX XXX XXX" required></label><label>Contact email<input name="email" type="email" autocomplete="email" value="${escapeHTML(profile.email)}" placeholder="shop@example.com"></label><label>Location in Mbale<input name="location" value="${escapeHTML(profile.location)}" required></label><label>Opening hours<input name="hours" value="${escapeHTML(profile.hours)}"></label><label class="sellerFormFull">Store description<textarea name="description" maxlength="500" required>${escapeHTML(profile.description)}</textarea></label><div class="sellerFormFull"><button class="primary" type="submit">Save shop profile</button></div></form><p class="sellerInlineNote">For production, profile edits should be versioned, moderated and audited on the server.</p>`;
+}
+function renderSellerPayments(){
+ const orders=sellerOrdersFor(),total=orders.reduce((sum,order)=>sum+Number(order.total||0),0),settled=orders.filter(order=>order.paymentStatus==="Paid").reduce((sum,order)=>sum+Number(order.total||0),0);
+ return `${sellerPageHeading("Payments & fees", "Review order value and settlement state.")}<div class="sellerMetricGrid sellerPaymentMetrics"><article><span>Recorded order value</span><strong>${money(total)}</strong><small>From local demo orders</small></article><article><span>Marked paid</span><strong>${money(settled)}</strong><small>Payment processor not connected</small></article><article><span>Marketplace fees</span><strong>Not configured</strong><small>No fee is charged in this demo</small></article></div><div class="sellerWorkspaceNotice"><strong>No real money moves here.</strong> Production payouts require a regulated payment provider, signed webhooks, reconciliation, seller KYC and an auditable ledger. Do not enter bank or mobile-money PIN details into this demo.</div>${sellerOrderTableMarkup(orders,false)}`;
+}
+function renderSellerVerification(){
+ return `${sellerPageHeading("Verification", "Prepare your shop for safe marketplace selling.")}<div class="sellerWorkspaceNotice"><strong>Secure verification is not connected.</strong> Identity and business documents must be uploaded to a protected backend, never stored in browser storage.</div><ul class="sellerChecklist"><li><span>Shop contact details</span><b>Complete in Shop profile</b></li><li><span>Business registration</span><b>Not submitted</b></li><li><span>Owner identity check</span><b>Not submitted</b></li><li><span>Payout account verification</span><b>Not connected</b></li></ul><h3>Production safeguards</h3><p class="sellerInlineNote">Use authenticated seller accounts, role-based access per shop, encrypted document storage, explicit consent, manual review and an audit trail. No sensitive documents should be uploaded here.</p>`;
+}
+function renderSellerSupport(){
+ return `${sellerPageHeading("Seller support", "Get help with shop setup, listings and order fulfilment.")}<div class="sellerSupportLinks"><a href="mailto:support@mbaleshopper.example?subject=Seller%20support">Email seller support <span>support@mbaleshopper.example</span></a><button type="button" onclick="showPolicy('terms')">Read seller terms</button><button type="button" onclick="showPolicy('privacy')">Read privacy information</button></div><section class="sellerOverviewSection"><h3>Before launch</h3><p class="sellerInlineNote">Set response-time expectations, return rules, prohibited items, complaint escalation and account recovery procedures. Add server-side moderation and an operational support queue.</p></section>`;
+}
+function renderSellerApplication(){
+ return `${sellerPageHeading("Seller application", "Apply to list your business on Mbale Shopper.", `<button type="button" class="sellerTableAction" onclick="renderSellerCenter('overview')">Back to overview</button>`)}<form class="sellerProfileForm" onsubmit="submitSellerApplication(event)"><label>Business name<input name="business" required maxlength="120"></label><label>Contact phone<input name="phone" type="tel" required autocomplete="tel"></label><label>Business category<select name="category" required>${categories.map(category=>`<option value="${escapeHTML(category.value)}">${escapeHTML(category.label)}</option>`).join("")}</select></label><label>Location in Mbale<input name="location" required></label><label class="sellerFormFull">Business description<textarea name="description" required maxlength="500"></textarea></label><p class="sellerFormFull sellerInlineNote">This demo saves an application locally. Production onboarding needs identity checks, consent, server validation and a review workflow.</p><div class="sellerFormFull"><button class="primary" type="submit">Submit application</button></div></form>${sellerApplications.length?`<section class="sellerOverviewSection"><h3>Saved applications</h3><ul class="sellerAttentionList">${sellerApplications.map(application=>`<li><span>${escapeHTML(application.business)} · ${escapeHTML(application.location)}</span><b>${escapeHTML(application.status)}</b></li>`).join("")}</ul></section>`:""}`;
+}
+function renderSellerProductForm(productId=null){
+ const product=productId?products.find(item=>item.id===Number(productId)):null;
+ if(product&&product.shop!==activeSellerShop){toast("This listing belongs to another shop");return}
+ const stock=product?getProductInventory(product.id).stock:"";
+ el("sellerWorkspaceContent").innerHTML=`${sellerPageHeading(product?"Edit listing":"Add listing","Required product details are validated before saving.",`<button type="button" class="sellerTableAction" onclick="renderSellerCenter('products')">Back to listings</button>`)}<form class="sellerProfileForm" onsubmit="saveSellerListing(event,${product?.id||"null"})"><label>Product name<input name="name" required maxlength="140" value="${escapeHTML(product?.name||"")}"></label><label>Category<select name="category" required>${categories.map(category=>`<option value="${escapeHTML(category.value)}"${category.value===(product?.cat||categories[0].value)?" selected":""}>${escapeHTML(category.label)}</option>`).join("")}</select></label><label>Price (UGX)<input name="price" type="number" min="1" step="1" required value="${product?.price||""}"></label><label>Was price (UGX)<input name="oldPrice" type="number" min="1" step="1" value="${product?.old||""}"></label><label>Stock quantity<input name="stock" type="number" min="0" step="1" required value="${stock}"></label><label>Product photo URL<input name="image" type="url" value="${escapeHTML(product?.image||"")}" placeholder="https://..."></label><label class="sellerFormFull">Description<textarea name="description" maxlength="600" required>${escapeHTML(product?.desc||"")}</textarea></label><div class="sellerFormFull sellerFormActions"><button class="primary" type="submit">Save listing</button><button class="sellerTableAction" type="button" onclick="renderSellerCenter('products')">Cancel</button></div></form>`;
+}
+function saveSellerListing(event,productId=null){
+ event.preventDefault();
+ const values=Object.fromEntries(new FormData(event.currentTarget).entries()),price=Number(values.price),old=Number(values.oldPrice)||price,stock=Number(values.stock);
+ if(!Number.isFinite(price)||price<1||!Number.isInteger(stock)||stock<0){toast("Enter a valid price and whole-number stock quantity");return}
+ if(old<price){toast("Was price should be equal to or higher than the current price");return}
+ let product=productId?products.find(item=>item.id===Number(productId)):null;
+ if(product&&product.shop!==activeSellerShop){toast("This listing belongs to another shop");return}
+ if(/[<>"\u0000-\u001f]/.test(values.name)||/[<>\u0000-\u001f]/.test(values.description)){toast("Product name and description cannot contain markup");return}
+ let image=values.image.trim()||(product?.image)||img(categories.find(category=>category.value===values.category)?.image||categories[0].image);
+ try{const parsedImage=new URL(image);if(!["https:","http:"].includes(parsedImage.protocol))throw new Error("Unsupported image URL");image=parsedImage.href}catch{toast("Use a valid HTTP or HTTPS photo URL");return}
+ const changes={name:values.name.trim(),cat:values.category,price,old,desc:values.description.trim(),image};
+ if(!product){const id=Math.max(...products.map(item=>item.id))+1;product={id,...changes,shop:activeSellerShop,rating:0,reviews:0,tag:"NEW",delivery:"Pickup / seller delivery"};products.push(product);sellerListings.push(product)}else{Object.assign(product,changes);sellerProductOverrides[product.id]=changes}
+ productGalleryImages.set(product.id,[product.image]);
+ const previous=getProductInventory(product.id);sellerInventory[product.id]={stock,sold:previous.sold||0};saveSellerData();
+ renderCatalogFilters();initSellerFilter();renderCatalog();renderDeals();renderRecommendations();renderSellerSection();
+ toast("Listing saved to the demo marketplace");
+}
+function saveSellerProfile(event){
+ event.preventDefault();
+ const profile=Object.fromEntries(new FormData(event.currentTarget).entries()),phone=profile.phone.replace(/[\s()-]/g,"");
+ if(!/^\+?\d{9,15}$/.test(phone)){toast("Enter a valid contact phone number");return}
+ profile.phone=phone;sellerProfiles[activeSellerShop]=profile;saveSellerData();renderSellerSection();toast("Shop profile saved in this browser");
+}
+function submitSellerApplication(event){
+ event.preventDefault();
+ const application={...Object.fromEntries(new FormData(event.currentTarget).entries()),id:`APP-${Date.now().toString(36).toUpperCase()}`,status:"Received · demo only",submittedAt:new Date().toISOString()};
+ sellerApplications.unshift(application);saveSellerData();renderSellerSection();toast("Application saved locally");
+}
+function updateSellerOrderStatus(orderId,status){
+ const order=sellerOrders.find(item=>item.id===orderId&&item.seller===activeSellerShop);if(!order)return;
+ order.status=status;order.updatedAt=new Date().toISOString();saveSellerData();renderSellerSection();toast(`Order ${orderId} updated`);
+}
+function selectSellerChat(chatId){
+ activeSellerChatId=chatId;const chat=chats.find(item=>item.id===chatId);
+ if(chat)chat.messages.forEach(message=>{if(message.from==="buyer")message.read=true});
+ if(chat)saveChats();renderSellerCenter("messages");
+}
+function sendSellerReply(event){
+ event.preventDefault();
+ const chat=chats.find(item=>item.id===activeSellerChatId),input=event.currentTarget.elements.reply,text=input.value.trim();
+ if(!chat||!text)return;
+ chat.messages.push({text,from:"seller",time:Date.now(),read:false});chat.updatedAt=Date.now();saveChats();renderSellerCenter("messages");toast("Reply saved in this demo");
+}
 function goHome(){if(!el("productPage").hidden){closeProductPage();return}window.scrollTo({top:0,behavior:"smooth"})}
-initCategories();initSearchPromptTrack();initCategoryMegaMenu();renderHeroPromos();renderCategories();renderDeals();renderRecommendations();renderSpotlight("eventSpotlight","UPCOMING EVENTS",eventSpotlightItems,"event");renderSpotlight("influencerSpotlight","TOP CITY INFLUENCERS",influencerSpotlightItems,"influencer");renderServiceCategories();renderServiceFilters();renderServices();renderPartners();initSellerFilter();renderCatalog();updateCartBadge();resumeSearchPromptRotation();
+initCategories();initSearchPromptTrack();initCategoryMegaMenu();renderHeroPromos();renderCategories();renderDeals();renderRecommendations();renderSpotlight("eventSpotlight","UPCOMING EVENTS",eventSpotlightItems,"event");renderSpotlight("influencerSpotlight","TOP CITY INFLUENCERS",influencerSpotlightItems,"influencer");renderServiceCategories();renderServiceFilters();renderServices();renderPartners();initSellerFilter();renderCatalog();updateCartBadge();updateMessageNotification();resumeSearchPromptRotation();
 const initialProductId=Number(location.hash.match(/^#product-(\d+)$/)?.[1]);if(initialProductId)openProduct(initialProductId,true);
