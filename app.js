@@ -620,7 +620,7 @@ function showTab(t){
  el("tabPane").innerHTML=content[t]||content.details;
  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));event?.target?.classList.add("active");
 }
-function closeModal(){el("modalWrap").classList.remove("show")}
+function closeModal(){if(typeof stopPosScanner==="function")stopPosScanner();el("modalWrap").classList.remove("show","posFullscreen")}
 function addToCart(id,offerIndex=selectedOfferIndexes[id]||0){
  if(getProductInventory(id).stock===0){toast("This item is out of stock");return}
  const product=products.find(item=>item.id===id),[seller,price]=getProductOffer(id,offerIndex),found=cart.find(item=>item.id===id&&(item.seller||product.shop)===seller&&Number(item.price??product.price)===price);
@@ -842,6 +842,670 @@ function sendSellerReply(event){
  if(!chat||!text)return;
  chat.messages.push({text,from:"seller",time:Date.now(),read:false});chat.updatedAt=Date.now();saveChats();renderSellerCenter("messages");toast("Reply saved in this demo");
 }
+function readPosLocal(key,fallback){
+ try{const value=localStorage.getItem(key);return value?JSON.parse(value):fallback}catch(error){console.error(`Unable to read ${key}`,error);return fallback}
+}
+function writePosLocal(key,value){
+ try{localStorage.setItem(key,JSON.stringify(value));return true}catch(error){console.error(`Unable to save ${key}`,error);return false}
+}
+const industryTemplates=[
+ {id:"Grocery",label:"Grocery",categories:["Grocery"]},
+ {id:"Pharmacy",label:"Pharmacy",categories:["Health & Pharmacy","Beauty & Fragrance"]},
+ {id:"Cafe",label:"Cafe",categories:["Grocery","Home"]},
+ {id:"Hardware",label:"Hardware",categories:["Home","Automotive"]}
+];
+let activePosShop=localStorage.getItem("mbalePosShop")||shops[0]?.name||products[0].shop;
+let activeManagedShop=localStorage.getItem("mbaleManagedShop")||activePosShop;
+let posSales=readPosLocal("mbalePosSales",[]),invoiceRecords=readPosLocal("mbaleSupplierInvoices",[]);
+let onlineStoreOrders=readPosLocal("mbaleOnlineStoreOrders",[]),publicShopCart=[],publicShopBusiness=null,publicShopForm={customerName:"",phone:"",fulfillment:"Pickup",address:""};
+let posAuditEntries=readPosLocal("mbalePosAudit",[]),managedCostOverrides=readPosLocal("mbaleManagedCosts",{});
+let businessIndustries=readPosLocal("mbaleBusinessIndustries",{});
+let advisorSuggestions=readPosLocal("mbaleAdvisorSuggestions",{});
+let dismissedAdvice=readPosLocal("mbaleDismissedAdvice",{});
+let ownerPosSection="home",managedStaffSection="overview",posSearchQuery="",posActiveCategory="all",parkedPosSales=readPosLocal("mbaleParkedSales",[]);
+let posCart=[],posPaymentMode="cash",posForm={customerName:"",phone:"",cashReceived:"",splitCash:"",splitTransfer:"",creditDeposit:""};
+let posDatabasePromise=null,posStorageWarningShown=false,posScanStream=null,posScanTimer=null,activeInvoiceObjectURL=null,deferredInstallPrompt=null;
+function getPosBusinessNames(){return [...new Set([...shops.map(shop=>shop.name),...products.map(product=>product.shop)])].sort((a,b)=>a.localeCompare(b))}
+function posBusinessProducts(shop=activePosShop){return products.filter(product=>product.shop===shop)}
+function getManagedCost(productId,shop=activeManagedShop){
+ const product=products.find(item=>item.id===Number(productId));
+ return Number(managedCostOverrides[`${shop}::${productId}`]??product?.buyingPrice??0);
+}
+function openPosDatabase(){
+ if(!("indexedDB" in window))return Promise.reject(new Error("IndexedDB is unavailable in this browser"));
+ if(!posDatabasePromise)posDatabasePromise=new Promise((resolve,reject)=>{
+  const request=indexedDB.open("mbale-shopper-offline",2);
+  request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains("sales"))db.createObjectStore("sales",{keyPath:"id"});if(!db.objectStoreNames.contains("invoices"))db.createObjectStore("invoices",{keyPath:"id"});if(!db.objectStoreNames.contains("onlineOrders"))db.createObjectStore("onlineOrders",{keyPath:"id"})};
+  request.onsuccess=()=>resolve(request.result);
+  request.onerror=()=>reject(request.error||new Error("Could not open the offline database"));
+ });
+ return posDatabasePromise;
+}
+function posDbRequest(storeName,operation,record){
+ return openPosDatabase().then(db=>new Promise((resolve,reject)=>{
+  const transaction=db.transaction(storeName,operation==="getAll"?"readonly":"readwrite"),store=transaction.objectStore(storeName);
+  const request=operation==="getAll"?store.getAll():store.put(record);
+  let result;
+  request.onsuccess=()=>{result=request.result;if(operation==="getAll")resolve(result)};
+  request.onerror=()=>reject(request.error||new Error(`Could not ${operation} ${storeName}`));
+  transaction.oncomplete=()=>{if(operation!=="getAll")resolve(result)};
+  transaction.onerror=()=>reject(transaction.error||new Error(`Could not finish ${storeName} transaction`));
+  transaction.onabort=()=>reject(transaction.error||new Error(`${storeName} transaction was cancelled`));
+ }));
+}
+function mergePosRecords(primary,secondary){
+ const records=new Map();
+ [...primary,...secondary].forEach(record=>{if(record?.id)records.set(record.id,{...records.get(record.id),...record})});
+ return [...records.values()].sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
+}
+async function hydratePosData(){
+ try{
+  const [storedSales,storedInvoices,storedOrders]=await Promise.all([posDbRequest("sales","getAll"),posDbRequest("invoices","getAll"),posDbRequest("onlineOrders","getAll")]);
+  posSales=mergePosRecords(storedSales,readPosLocal("mbalePosSales",[]));
+  invoiceRecords=mergePosRecords(storedInvoices,readPosLocal("mbaleSupplierInvoices",[]));
+  onlineStoreOrders=mergePosRecords(storedOrders,readPosLocal("mbaleOnlineStoreOrders",[]));
+  writePosLocal("mbalePosSales",posSales);
+  writePosLocal("mbaleSupplierInvoices",invoiceRecords.map(({file,...metadata})=>metadata));
+  writePosLocal("mbaleOnlineStoreOrders",onlineStoreOrders);
+  updateWorkspaceConnection();
+ }catch(error){
+  console.error("Offline records could not be loaded from IndexedDB",error);
+  posSales=readPosLocal("mbalePosSales",[]);
+  invoiceRecords=readPosLocal("mbaleSupplierInvoices",[]);
+  onlineStoreOrders=readPosLocal("mbaleOnlineStoreOrders",[]);
+  if(!posStorageWarningShown){toast("Offline database unavailable; using browser storage where possible");posStorageWarningShown=true}
+  updateWorkspaceConnection();
+ }
+}
+async function storePosRecord(storeName,record){
+ try{
+  await posDbRequest(storeName,"put",record);
+  return "indexedDB";
+ }catch(error){
+  console.error(`Could not persist ${storeName} record to IndexedDB`,error);
+  if(storeName==="sales"||storeName==="onlineOrders"){
+   const key=storeName==="sales"?"mbalePosSales":"mbaleOnlineStoreOrders",records=mergePosRecords(readPosLocal(key,[]),[record]);
+   if(writePosLocal(key,records)){
+     if(!posStorageWarningShown){toast(`${storeName==="sales"?"Sale":"Online order"} saved on this device using browser-storage fallback`);posStorageWarningShown=true}
+    return "localStorage";
+   }
+  }
+  throw error;
+ }
+}
+function persistPosMetadata(){
+ const salesSaved=writePosLocal("mbalePosSales",posSales);
+ const invoicesSaved=writePosLocal("mbaleSupplierInvoices",invoiceRecords.map(({file,...metadata})=>metadata));
+ const ordersSaved=writePosLocal("mbaleOnlineStoreOrders",onlineStoreOrders);
+ if(!salesSaved||!invoicesSaved||!ordersSaved)toast("Some demo metadata could not be saved in browser storage");
+}
+function getBusinessSales(shop=activePosShop){return posSales.filter(sale=>sale.business===shop&&sale.source!=="online")}
+function getBusinessOnlineOrders(shop=activePosShop){return onlineStoreOrders.filter(order=>order.business===shop)}
+function currentPosTotal(){return posCart.reduce((sum,item)=>{const product=products.find(entry=>entry.id===item.productId);return sum+Number(item.unitPrice??product?.price??0)*item.quantity},0)}
+function currentPosStock(productId){return Number(getProductInventory(productId).stock||0)}
+function pendingPosSyncCount(){return [...posSales,...onlineStoreOrders].filter(record=>record.syncStatus==="pending_backend").length}
+function currentPosStatus(){
+ const pending=pendingPosSyncCount();
+ return navigator.onLine?`Online · ${pending} pending sync`:`Offline · ${pending} pending locally`;
+}
+function workspaceHeader(title,shop,onChange,staff=false,mobileNav=false){
+ return `<header class="workspaceHeader">${mobileNav?`<button class="workspaceNavToggle" type="button" aria-label="Open POS navigation" aria-controls="ownerPosNav" aria-expanded="false" onclick="toggleOwnerPosNav()">☰</button>`:""}<div class="workspaceBrand"><small>${staff?"MANAGED OPERATIONS":"MBALE SHOPPER"}</small><h1>${title}</h1></div><label class="workspaceHeaderBusiness"><span>${staff?"Business":"Demo shop"}</span><select aria-label="${staff?"Select managed business":"Select POS business"}" onchange="${onChange}(this.value)">${getPosBusinessNames().map(name=>`<option value="${escapeHTML(name)}"${name===shop?" selected":""}>${escapeHTML(name)}</option>`).join("")}</select></label><span class="workspaceStatus${navigator.onLine?"":" offline"}" id="workspaceConnectionStatus" title="Local records are not automatically synchronized">${currentPosStatus()}</span>${deferredInstallPrompt?`<button class="workspaceButton secondary" type="button" onclick="installMbaleApp()">Install</button>`:""}<button class="workspaceClose" type="button" aria-label="Close workspace" onclick="stopPosScanner();closeModal()">×</button></header>`;
+}
+let mobileCheckoutOpen=false;
+function toggleOwnerPosNav(force){
+ const screen=el("modal")?.querySelector(".ownerPosWorkspace");if(!screen)return;
+ const open=force??!screen.classList.contains("ownerPosNavOpen");screen.classList.toggle("ownerPosNavOpen",open);
+ const button=screen.querySelector(".workspaceNavToggle");if(button){button.setAttribute("aria-expanded",String(open));button.setAttribute("aria-label",open?"Close POS navigation":"Open POS navigation")}
+}
+function toggleMobileCheckout(force){
+ const screen=el("modal")?.querySelector(".ownerPosWorkspace");if(!screen)return;
+ mobileCheckoutOpen=force??!mobileCheckoutOpen;screen.classList.toggle("mobileCheckoutOpen",mobileCheckoutOpen);
+ const button=screen.querySelector(".posMobileCartBar");if(button)button.setAttribute("aria-expanded",String(mobileCheckoutOpen));
+}
+function showOwnerPOS(section="home"){
+ if(!getPosBusinessNames().includes(activePosShop))activePosShop=getPosBusinessNames()[0];
+ ownerPosSection=section;mobileCheckoutOpen=false;
+ el("modalWrap").classList.add("posFullscreen");
+ el("modal").innerHTML=`<div class="workspaceScreen ownerPosWorkspace" role="dialog" aria-modal="true" aria-label="Owner point of sale">${workspaceHeader("Owner POS",activePosShop,"switchPosBusiness",false,true)}<button class="workspaceNavBackdrop" type="button" aria-label="Close POS navigation" onclick="toggleOwnerPosNav(false)"></button><nav class="workspaceTabs" id="ownerPosNav" aria-label="POS sections">${[["home","Home"],["sale","New sale"],["parked","Parked sales"],["sales","Sales"],["online","Online orders"],["credit","Credit ledger"],["invoice","Supplier bills"],["advisor","Weekly advice"]].map(([key,label])=>`<button class="workspaceTab${ownerPosSection===key?" active":""}" type="button" onclick="showOwnerPOS('${key}')">${label}${key==="online"&&getBusinessOnlineOrders(activePosShop).some(order=>order.status==="New")?` <span class="workspaceStatusPill warning">${getBusinessOnlineOrders(activePosShop).filter(order=>order.status==="New").length}</span>`:key==="parked"&&parkedPosSales.filter(sale=>sale.business===activePosShop).length?` <span class="workspaceStatusPill">${parkedPosSales.filter(sale=>sale.business===activePosShop).length}</span>`:""}</button>`).join("")}<button class="workspaceTab" type="button" onclick="openShopPreview(activePosShop)">Store preview ↗</button></nav><main class="workspaceBody" id="ownerPosBody"></main><div class="posScanner" id="posScanner" hidden><div class="posScannerCard"><video id="posScannerVideo" autoplay playsinline></video><p class="workspaceHint">Point the camera at a product barcode.</p><button class="workspaceButton secondary" type="button" onclick="stopPosScanner()">Close camera</button></div></div></div>`;
+ el("modalWrap").classList.add("show");
+ renderOwnerPosSection();
+ hydratePosData().then(()=>{if(el("ownerPosBody"))renderOwnerPosSection()});
+ if(section==="sale")focusPosSearch();
+}
+function switchPosBusiness(shop){
+ if(posCart.length&&shop!==activePosShop&&!confirm("Switching businesses clears the current basket. Continue?")){renderOwnerPOS(ownerPosSection);return}
+ if(shop!==activePosShop){posCart=[];posPaymentMode="cash";posForm={customerName:"",phone:"",cashReceived:"",splitCash:"",splitTransfer:"",creditDeposit:""}}
+ activePosShop=shop;localStorage.setItem("mbalePosShop",shop);renderOwnerPOS(ownerPosSection);
+}
+function renderOwnerPosSection(){
+ const body=el("ownerPosBody");if(!body)return;
+ const renderers={home:renderOwnerDashboard,sale:renderPosSale,parked:renderParkedPosSales,sales:renderPosSales,online:renderPosOnlineOrders,credit:renderPosCredit,invoice:renderPosInvoices,advisor:renderOwnerAdvice};
+ body.innerHTML=(renderers[ownerPosSection]||renderPosSale)();
+ if(ownerPosSection==="sale"){
+  const count=posCart.reduce((sum,item)=>sum+item.quantity,0),total=currentPosTotal();
+  body.querySelector(".posCurrentSale")?.setAttribute("id","posCurrentSale");
+  body.querySelector(".posCheckoutHead")?.insertAdjacentHTML("beforeend",`<button class="posCheckoutClose" type="button" aria-label="Close sale checkout" onclick="toggleMobileCheckout(false)">×</button>`);
+  body.insertAdjacentHTML("beforeend",`<button class="posCheckoutBackdrop" type="button" aria-label="Close sale checkout" onclick="toggleMobileCheckout(false)"></button><button class="posMobileCartBar" type="button" aria-controls="posCurrentSale" aria-expanded="${mobileCheckoutOpen}" onclick="toggleMobileCheckout(true)"><span><small>Current sale · ${count} item${count===1?"":"s"}</small><strong>${money(total)}</strong></span><span class="posMobileCartAction">Review sale <b aria-hidden="true">↑</b></span></button>`);
+ }
+ if(ownerPosSection==="sale")focusPosSearch();
+}
+function focusPosSearch(){
+ if(window.matchMedia?.("(max-width: 620px)").matches)return;
+ const focus=()=>el("ownerPosBody")?.querySelector(".posSearchInput")?.focus();
+ if(typeof requestAnimationFrame==="function")requestAnimationFrame(focus);else setTimeout(focus,0);
+}
+function renderOwnerDashboard(){
+ const sales=getBusinessSales(activePosShop).filter(sale=>sale.status!=="Voided"),today=new Date().toDateString();
+ const todaySales=sales.filter(sale=>new Date(sale.createdAt).toDateString()===today),online=getBusinessOnlineOrders(activePosShop).filter(order=>order.status==="New");
+ const debts=sales.filter(sale=>Number(sale.due)>0),lowStock=posBusinessProducts().filter(product=>currentPosStock(product.id)<=5);
+ const tips=(advisorSuggestions[activePosShop]||[]).filter(tip=>!(dismissedAdvice[activePosShop]||[]).includes(tip.id));
+ const recent=[...online.map(order=>({...order,kind:"Online"})),...todaySales.map(sale=>({...sale,kind:"POS"}))].sort((a,b)=>b.createdAt-a.createdAt).slice(0,5);
+ return `<div class="workspaceNotice"><strong>Device-local demo.</strong> ${currentPosStatus()}. No records are sent to a server, and reconnecting does not sync them.</div><div class="workspacePageHead posDashboardHead"><div><h2>Today at ${escapeHTML(activePosShop)}</h2><p>Your shop at a glance. Start a sale or review what needs attention.</p></div><button class="workspaceButton primary" type="button" onclick="showOwnerPOS('sale')">＋ Start a sale</button></div><div class="posMetricGrid posDashboardMetrics"><article class="posMetric"><span>Today's POS sales</span><strong>${money(todaySales.reduce((sum,sale)=>sum+sale.total,0))}</strong><small>${todaySales.length} transactions · device-local</small></article><article class="posMetric"><span>Online orders to pack</span><strong>${online.length}</strong><small>Notifications are not connected</small></article><article class="posMetric"><span>Customer credit outstanding</span><strong>${money(debts.reduce((sum,sale)=>sum+Number(sale.due),0))}</strong><small>${debts.length} local credit sales</small></article><article class="posMetric"><span>Products low in stock</span><strong>${lowStock.length}</strong><small>At or below 5 units</small></article></div><div class="posDashboardGrid"><section class="workspaceCard"><div class="workspaceSectionTitle"><h3>Recent activity</h3><button class="workspaceButton secondary" type="button" onclick="showOwnerPOS('online')">View online orders</button></div><div class="workspaceList">${recent.length?recent.map(record=>`<article class="workspaceListItem"><div><strong>${escapeHTML(record.kind)} · ${escapeHTML(record.id)} · ${money(record.total)}</strong><p>${escapeHTML(record.customerName||"Walk-in customer")} · ${record.kind==="Online"?escapeHTML(record.status):record.paymentStatus==="Awaiting verification"?"Payment awaiting verification":"POS sale saved locally"}</p><small>${new Date(record.createdAt).toLocaleString()}</small></div></article>`).join(""):`<div class="posEmpty">No sales or online orders yet.</div>`}</div></section><section class="workspaceCard"><div class="workspaceSectionTitle"><h3>Needs attention</h3><button class="workspaceButton secondary" type="button" onclick="showOwnerPOS('credit')">Credit ledger</button></div><div class="workspaceList">${online.slice(0,4).map(order=>`<article class="workspaceListItem"><div><strong>Pack order ${escapeHTML(order.id)}</strong><p>${escapeHTML(order.customerName)} · ${money(order.total)}</p></div><span class="workspaceStatusPill warning">New</span></article>`).join("")}${lowStock.slice(0,4).map(product=>`<article class="workspaceListItem"><div><strong>${escapeHTML(product.name)}</strong><p>${currentPosStock(product.id)} left · restock when convenient</p></div><span class="workspaceStatusPill${currentPosStock(product.id)===0?" danger":"warning"}">${currentPosStock(product.id)===0?"Out":"Low stock"}</span></article>`).join("")}${!online.length&&!lowStock.length?`<div class="posEmpty">Nothing needs attention right now.</div>`:""}</div></section></div>${tips.length?`<section class="workspaceCard posDashboardAdvice"><div class="workspaceSectionTitle"><h3>Weekly advice</h3><button class="workspaceButton secondary" type="button" onclick="showOwnerPOS('advisor')">View all</button></div>${tips.slice(0,2).map(tip=>`<article class="workspaceListItem"><div><strong>${escapeHTML(tip.title)}</strong><p>${escapeHTML(tip.message)}</p></div><button class="workspaceButton secondary" type="button" onclick="dismissAdvice('${escapeHTML(tip.id)}')">Mark read</button></article>`).join("")}</section>`:""}`;
+}
+function renderPosSale(){
+ const items=posBusinessProducts().filter(product=>(posActiveCategory==="all"||product.cat===posActiveCategory)&&(!posSearchQuery||`${product.name} ${product.cat} ${product.barcode||""}`.toLowerCase().includes(posSearchQuery.toLowerCase())));
+ const categories=["all",...new Set(posBusinessProducts().map(product=>product.cat))];
+ const total=currentPosTotal(),cashValue=Number(posForm.cashReceived||total),change=Math.max(0,cashValue-total);
+ const cartMarkup=posCart.length?posCart.map((item,index)=>{const product=products.find(entry=>entry.id===item.productId),unitPrice=Number(item.unitPrice??product?.price);if(!product)return "";return `<div class="posCartRow"><strong title="${escapeHTML(item.name||product.name)}">${escapeHTML(item.name||product.name)}</strong><small>${money(unitPrice)} each</small><span class="posCartRowTotal">${money(unitPrice*item.quantity)}</span><div class="posQuantity"><button type="button" aria-label="Remove one ${escapeHTML(product.name)}" onclick="changePosQuantity(${index},-1)">−</button><span>${item.quantity}</span><button type="button" aria-label="Add one ${escapeHTML(product.name)}" onclick="changePosQuantity(${index},1)">+</button></div><button class="workspaceButton secondary posRemoveItemButton" type="button" aria-label="Remove ${escapeHTML(product.name)} from sale" title="Remove item" onclick="removePosItem(${index})">×</button></div>`}).join(""):`<div class="posEmpty posCartEmpty"><span class="posCartEmptyIcon" aria-hidden="true">＋</span><strong>Nothing in this sale yet</strong><span>Choose a product to get started.</span></div>`;
+ let paymentFields="";
+ if(posPaymentMode==="cash")paymentFields=`<label class="full">Cash received (UGX)<input type="number" min="${total}" step="1" value="${escapeHTML(posForm.cashReceived||String(total))}" oninput="updatePosField('cashReceived',this.value)"></label>`;
+ if(posPaymentMode==="split")paymentFields=`<label>Cash (UGX)<input type="number" min="0" step="1" value="${escapeHTML(posForm.splitCash)}" oninput="updatePosField('splitCash',this.value)"></label><label>Transfer/card (UGX)<input type="number" min="0" step="1" value="${escapeHTML(posForm.splitTransfer)}" oninput="updatePosField('splitTransfer',this.value)"></label>`;
+ if(posPaymentMode==="credit")paymentFields=`<label class="full">Cash deposit paid now (UGX)<input type="number" min="0" max="${total}" step="1" value="${escapeHTML(posForm.creditDeposit)}" oninput="updatePosField('creditDeposit',this.value)"></label><label>Customer name<input value="${escapeHTML(posForm.customerName)}" oninput="updatePosField('customerName',this.value)" autocomplete="name"></label><label>Phone number<input type="tel" value="${escapeHTML(posForm.phone)}" oninput="updatePosField('phone',this.value)" autocomplete="tel"></label>`;
+ return `<div class="workspaceNotice"><strong>Frontend prototype.</strong> Transactions are saved on this device only. Transfer/card entries are recorded but are not verified; no server sync or payment processing is active.</div><div class="posSaleLayout"><section class="posCatalogPanel"><div class="posCatalogToolbar"><input class="posSearchInput" type="search" aria-label="Search POS products" placeholder="Search product or scan barcode (Enter to add)" value="${escapeHTML(posSearchQuery)}" oninput="updatePosSearch(this.value)" onkeydown="handlePosSearchKeydown(event)" autocomplete="off"><button class="workspaceButton secondary" type="button" onclick="scanPosBarcode()">Camera scan</button></div><div class="posCategoryRail">${categories.map(category=>`<button class="posCategoryButton${posActiveCategory===category?" active":""}" type="button" onclick="setPosCategory('${escapeHTML(category)}')">${category==="all"?"All":escapeHTML(category)}</button>`).join("")}</div><div class="posProductGrid">${items.length?items.map(product=>{const stock=currentPosStock(product.id),disabled=stock<1||Number(product.price)<=0;return `<button class="posProductCard" type="button" ${disabled?"disabled":""} onclick="addPosItem(${product.id})" aria-label="Add ${escapeHTML(product.name)} to basket"><img src="${escapeHTML(product.image)}" alt="" loading="lazy"><span class="posProductCopy"><strong>${escapeHTML(product.name)}</strong><span>${Number(product.price)>0?money(product.price):"Price not set"}</span><small>${stock>0?`${stock} in stock`:stock===0?"Out of stock":"Stock unavailable"}</small></span></button>`}).join(""):`<div class="posEmpty">No matching products for this business.</div>`}</div></section><aside class="posCheckoutPanel posCurrentSale"><div class="posCheckoutHead"><div class="posCheckoutTitle"><span>CHECKOUT</span><h2>Current sale</h2></div><span class="posItemCount"><strong>${posCart.reduce((sum,item)=>sum+item.quantity,0)}</strong> items</span></div><div class="posCartRows">${cartMarkup}</div><div class="posTotalRow posSaleTotal"><span>Total to collect</span><strong>${money(total)}</strong></div><div class="posPaymentModes" role="group" aria-label="Payment method">${[["cash","Cash"],["transfer","Transfer / card"],["split","Split"],["credit","Credit"]].map(([key,label])=>`<button class="posPaymentMode${posPaymentMode===key?" active":""}" type="button" onclick="setPosPaymentMode('${key}')">${label}</button>`).join("")}</div>${posPaymentMode==="transfer"?`<div class="posPaymentWarning"><strong>Awaiting verification</strong><span>Record the payment only; this demo cannot confirm receipt.</span></div>`:""}${posPaymentMode==="split"?`<div class="posPaymentWarning"><strong>Transfer/card amount is unverified</strong><span>Cash can be counted locally; card/transfer must be checked separately.</span></div>`:""}<div class="posCheckoutFields">${paymentFields}</div>${posPaymentMode==="cash"&&total?`<div class="posChangeDue">Change: ${money(change)}</div>`:""}${posPaymentMode==="credit"&&total?`<div class="posChangeDue">Balance due: ${money(Math.max(0,total-Number(posForm.creditDeposit||0)))}</div>`:""}${posCart.length?`<div class="posSaleActions"><button class="workspaceButton secondary" type="button" onclick="parkPosSale()">Park sale</button><button class="workspaceButton secondary" type="button" onclick="clearPosBasket()">Clear basket</button></div>`:""}<button class="posCompleteButton" type="button" onclick="completePosSale()" ${!posCart.length?"disabled":""}>Complete sale · ${money(total)}</button><p class="posKeyboardHint"><kbd>F2</kbd> search · <kbd>F4</kbd> payment · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> finish</p></aside></div>`;
+}
+function renderParkedPosSales(){
+ const parked=parkedPosSales.filter(sale=>sale.business===activePosShop).sort((a,b)=>b.parkedAt-a.parkedAt);
+ return `<div class="workspacePageHead"><div><h2>Parked sales</h2><p>Resume an unfinished basket on this device. These are not synced.</p></div><button class="workspaceButton primary" type="button" onclick="showOwnerPOS('sale')">New sale</button></div><div class="workspaceList">${parked.length?parked.map(sale=>`<article class="workspaceListItem"><div><strong>${sale.lines.reduce((sum,line)=>sum+line.quantity,0)} items · ${money(sale.total)}</strong><p>${sale.lines.map(line=>`${escapeHTML(line.name)} × ${line.quantity}`).join(", ")}<br>${sale.customerName?`For ${escapeHTML(sale.customerName)} · `:""}${new Date(sale.parkedAt).toLocaleString()}</p></div><div class="posParkedActions"><button class="workspaceButton primary" type="button" onclick="resumeParkedPosSale('${escapeHTML(sale.id)}')">Resume</button><button class="workspaceButton secondary" type="button" onclick="deleteParkedPosSale('${escapeHTML(sale.id)}')">Delete</button></div></article>`).join(""):`<div class="posEmpty">No parked sales for this shop.</div>`}</div>`;
+}
+function saveParkedPosSales(){
+ if(!writePosLocal("mbaleParkedSales",parkedPosSales)){toast("Parked sale could not be saved in this browser");return false}
+ return true;
+}
+function parkPosSale(){
+ if(!posCart.length){toast("Add products before parking a sale");return}
+ const sale={id:`PARK-${Date.now().toString(36).toUpperCase()}`,business:activePosShop,parkedAt:Date.now(),paymentMode:posPaymentMode,form:{...posForm},lines:posCart.map(item=>{const product=products.find(entry=>entry.id===item.productId);return {productId:item.productId,name:item.name||product?.name||"Product",quantity:item.quantity,unitPrice:Number(item.unitPrice??product?.price??0)}}),total:currentPosTotal()};
+ parkedPosSales=[sale,...parkedPosSales];
+ if(!saveParkedPosSales()){parkedPosSales=parkedPosSales.filter(item=>item.id!==sale.id);return}
+ posCart=[];posPaymentMode="cash";posForm={customerName:"",phone:"",cashReceived:"",splitCash:"",splitTransfer:"",creditDeposit:""};
+ toast("Sale parked on this device");showOwnerPOS("parked");
+}
+function resumeParkedPosSale(saleId){
+ const sale=parkedPosSales.find(item=>item.id===saleId&&item.business===activePosShop);if(!sale)return;
+ if(posCart.length&&!confirm("Park the current basket and resume this sale?"))return;
+ if(posCart.length){
+  const current={id:`PARK-${Date.now().toString(36).toUpperCase()}`,business:activePosShop,parkedAt:Date.now(),paymentMode:posPaymentMode,form:{...posForm},lines:posCart.map(item=>{const product=products.find(entry=>entry.id===item.productId);return {productId:item.productId,name:item.name||product?.name||"Product",quantity:item.quantity,unitPrice:Number(item.unitPrice??product?.price??0)}}),total:currentPosTotal()};
+  parkedPosSales.unshift(current);
+ }
+ posCart=sale.lines.map(line=>({productId:line.productId,name:line.name,quantity:line.quantity,unitPrice:line.unitPrice}));
+ posPaymentMode=sale.paymentMode||"cash";posForm={customerName:"",phone:"",cashReceived:"",splitCash:"",splitTransfer:"",creditDeposit:"",...sale.form};
+ parkedPosSales=parkedPosSales.filter(item=>item.id!==saleId);
+ if(!saveParkedPosSales()){parkedPosSales.push(sale);return}
+ showOwnerPOS("sale");
+}
+function deleteParkedPosSale(saleId){
+ const existing=parkedPosSales.find(sale=>sale.id===saleId&&sale.business===activePosShop);if(!existing)return;
+ if(!confirm("Delete this parked basket?"))return;
+ parkedPosSales=parkedPosSales.filter(sale=>sale.id!==saleId);
+ if(!saveParkedPosSales()){parkedPosSales.push(existing);return}
+ renderOwnerPosSection();
+}
+function handlePosSearchKeydown(event){
+ if(event.key!=="Enter")return;
+ event.preventDefault();
+ const query=event.currentTarget.value.trim().toLowerCase();if(!query)return;
+ const matches=posBusinessProducts().filter(product=>String(product.barcode||"").toLowerCase()===query);
+ const exact=matches[0]||posBusinessProducts().find(product=>product.name.trim().toLowerCase()===query);
+ if(exact){addPosItem(exact.id);posSearchQuery="";renderOwnerPosSection();focusPosSearch();return}
+ const visible=posBusinessProducts().filter(product=>(posActiveCategory==="all"||product.cat===posActiveCategory)&&`${product.name} ${product.cat} ${product.barcode||""}`.toLowerCase().includes(query)&&currentPosStock(product.id)>0);
+ if(visible.length===1){addPosItem(visible[0].id);posSearchQuery="";renderOwnerPosSection();focusPosSearch();return}
+ toast(visible.length?"More than one product matches; narrow the search":"No available product matches that search");
+}
+function handlePosHotkeys(event){
+ if(!el("modalWrap")?.classList.contains("posFullscreen"))return;
+ if(event.key==="Escape"){
+  const screen=el("modal")?.querySelector(".ownerPosWorkspace");
+  if(screen?.classList.contains("mobileCheckoutOpen")){toggleMobileCheckout(false);event.preventDefault();return}
+  if(screen?.classList.contains("ownerPosNavOpen")){toggleOwnerPosNav(false);event.preventDefault();return}
+ }
+ const target=event.target,editable=target instanceof Element&&(target.matches("input,textarea,select")||target.isContentEditable);
+ if(event.key==="F2"){event.preventDefault();if(ownerPosSection!=="sale")showOwnerPOS("sale");else focusPosSearch();return}
+ if(event.key==="F4"&&!editable&&ownerPosSection==="sale"){
+  event.preventDefault();const modes=["cash","transfer","split","credit"],next=(modes.indexOf(posPaymentMode)+1)%modes.length;setPosPaymentMode(modes[next]);return;
+ }
+ if(event.key==="Enter"&&event.ctrlKey&&ownerPosSection==="sale"){event.preventDefault();completePosSale()}
+}
+window.addEventListener("keydown",handlePosHotkeys);
+function updatePosSearch(value){
+ posSearchQuery=value;renderOwnerPosSection();
+ const input=el("ownerPosBody")?.querySelector('input[type="search"]');
+ if(input){input.focus();input.setSelectionRange(value.length,value.length)}
+}
+function setPosCategory(category){posActiveCategory=category;renderOwnerPosSection()}
+function updatePosField(key,value){
+ posForm[key]=value;
+ const notice=el("ownerPosBody")?.querySelector(".posChangeDue");
+ if(!notice)return;
+ if(key==="cashReceived"&&posPaymentMode==="cash")notice.textContent=`Change: ${money(Math.max(0,Number(value||0)-currentPosTotal()))}`;
+ if(key==="creditDeposit"&&posPaymentMode==="credit")notice.textContent=`Balance due: ${money(Math.max(0,currentPosTotal()-Number(value||0)))}`;
+}
+function setPosPaymentMode(mode){posPaymentMode=mode;if(mode==="cash"&&!posForm.cashReceived)posForm.cashReceived=String(currentPosTotal());renderOwnerPosSection()}
+function addPosItem(productId){
+ const product=products.find(item=>item.id===Number(productId));if(!product)return;
+ if(product.shop!==activePosShop){toast("This product is not in the selected business");return}
+ const existing=posCart.find(item=>item.productId===product.id),stock=currentPosStock(product.id);
+ if(!Number(product.price)||stock<1){toast("Set a selling price and available stock before adding this item");return}
+ if(existing&&existing.quantity>=stock){toast("Basket quantity cannot exceed available stock");return}
+ if(existing)existing.quantity++;else posCart.push({productId:product.id,name:product.name,unitPrice:Number(product.price),quantity:1});
+ renderOwnerPosSection();
+}
+function changePosQuantity(index,delta){
+ const item=posCart[index];if(!item)return;
+ if(delta>0&&item.quantity>=currentPosStock(item.productId)){toast("Basket quantity cannot exceed available stock");return}
+ item.quantity+=delta;if(item.quantity<=0)posCart.splice(index,1);renderOwnerPosSection();
+}
+function removePosItem(index){posCart.splice(index,1);renderOwnerPosSection()}
+function clearPosBasket(){if(!posCart.length)return;if(!confirm("Clear all items from this basket?"))return;posCart=[];renderOwnerPosSection()}
+async function completePosSale(){
+ if(!posCart.length){toast("Add products before completing a sale");return}
+ const total=currentPosTotal(),quantities=new Map();
+ if(!Number.isInteger(total)||total<=0){toast("Sale total must be a positive whole number of UGX");return}
+ posCart.forEach(item=>quantities.set(item.productId,(quantities.get(item.productId)||0)+item.quantity));
+ for(const [productId,quantity] of quantities){if(currentPosStock(productId)<quantity){toast(`${products.find(product=>product.id===productId)?.name||"Item"} no longer has enough stock`);return}}
+ let payments=[],paid=0,customerName=posForm.customerName.trim(),phone=posForm.phone.trim();
+ if(posPaymentMode==="cash"){
+  const tendered=Number(posForm.cashReceived||total);if(!Number.isInteger(tendered)||tendered<total){toast("Cash received must cover the sale total using a whole UGX amount");return}
+  paid=total;payments=[{method:"Cash",amount:total,status:"counted_locally",change:tendered-total}];
+ }else if(posPaymentMode==="transfer"){paid=total;payments=[{method:"Transfer / card",amount:total,status:"awaiting_verification"}]}
+ else if(posPaymentMode==="split"){
+  const cash=Number(posForm.splitCash||0),transfer=Number(posForm.splitTransfer||0);
+  if(!Number.isInteger(cash)||!Number.isInteger(transfer)||cash<0||transfer<0||cash+transfer!==total){toast("Cash and transfer amounts must be whole numbers that add up to the exact total");return}
+  paid=total;payments=[{method:"Cash",amount:cash,status:"counted_locally"},{method:"Transfer / card",amount:transfer,status:"awaiting_verification"}].filter(payment=>payment.amount>0);
+ }else{
+  const deposit=Number(posForm.creditDeposit||0);
+  if(!Number.isInteger(deposit)||deposit<0||deposit>total){toast("Enter a whole-number credit deposit between zero and the total");return}
+  if(total-deposit>0&&(!customerName||!phone)){toast("Credit sales need the customer's name and phone number");return}
+  const creditPhoneDigits=phone.replace(/\D/g,"");
+  if(total-deposit>0&&(creditPhoneDigits.length<9||creditPhoneDigits.length>15)){toast("Enter a valid customer phone number");return}
+  paid=deposit;if(deposit)payments=[{method:"Cash deposit",amount:deposit,status:"counted_locally"}];
+ }
+ const lines=posCart.map(item=>{const product=products.find(entry=>entry.id===item.productId),unitPrice=Number(item.unitPrice??product?.price);return {productId:product.id,name:item.name||product.name,quantity:item.quantity,unitPrice,costPrice:getManagedCost(product.id,activePosShop),lineTotal:unitPrice*item.quantity}});
+ const paymentStatus=posPaymentMode==="transfer"||posPaymentMode==="split"&&payments.some(payment=>payment.status==="awaiting_verification")?"Awaiting verification":total-paid?"Credit outstanding":"Recorded locally";
+ const sale={id:`POS-${Date.now().toString(36).toUpperCase()}`,business:activePosShop,createdAt:Date.now(),source:"in-store",lines,total,paid,due:posPaymentMode==="credit"?total-paid:0,payments,customerName:customerName||"Walk-in customer",phone:phone||"",dueAt:posPaymentMode==="credit"&&total-paid?Date.now()+30*24*60*60*1000:null,status:"Completed",paymentStatus,syncStatus:"pending_backend"};
+ try{
+  const storage=await storePosRecord("sales",sale);
+  posSales=mergePosRecords(posSales,[sale]);
+  quantities.forEach((quantity,id)=>{const inventory=getProductInventory(id);sellerInventory[id]={stock:inventory.stock-quantity,sold:inventory.sold+quantity}});
+  try{saveSellerData()}catch(error){console.error("Sale saved but inventory could not be mirrored to browser storage",error);toast("Sale saved locally; stock mirror could not be updated")}
+  persistPosMetadata();appendPosAudit("sale_created",`${sale.id} · ${money(total)}`,activePosShop);
+  posCart=[];posForm={customerName:"",phone:"",cashReceived:"",splitCash:"",splitTransfer:"",creditDeposit:""};toggleMobileCheckout(false);
+  renderCatalog();renderDeals();renderRecommendations();renderOwnerPosSection();
+  updateWorkspaceConnection();
+  toast(storage==="indexedDB"?"Sale saved offline; awaiting backend sync":"Sale saved in browser storage only");
+  showPosReceipt(sale.id);
+ }catch(error){console.error("Sale could not be saved",error);toast("Sale was not saved. Keep the basket open and try again")}
+}
+function renderPosSales(){
+ const sales=getBusinessSales().filter(sale=>sale.status!=="Voided");
+ const today=new Date().toDateString(),todaySales=sales.filter(sale=>new Date(sale.createdAt).toDateString()===today);
+ return `<div class="workspacePageHead"><div><h2>Recent sales</h2><p>Transactions recorded on this device. Transfer/card entries stay pending until checked by staff.</p></div><button class="workspaceButton primary" type="button" onclick="showOwnerPOS('sale')">New sale</button></div><div class="posMetricGrid"><article class="posMetric"><span>Today's sales</span><strong>${money(todaySales.reduce((sum,sale)=>sum+sale.total,0))}</strong><small>${todaySales.length} transactions</small></article><article class="posMetric"><span>Pending online orders</span><strong>${getBusinessOnlineOrders(activePosShop).filter(order=>order.status==="New").length}</strong><small>Local storefront orders</small></article></div><div class="workspaceTableWrap"><table class="workspaceTable"><thead><tr><th>Receipt</th><th>Items</th><th>Customer</th><th>Total</th><th>Payment status</th><th></th></tr></thead><tbody>${sales.length?sales.map(sale=>`<tr><td><strong>${escapeHTML(sale.id)}</strong><small>${new Date(sale.createdAt).toLocaleString()}</small></td><td>${sale.lines.map(line=>`${escapeHTML(line.name)} × ${line.quantity}`).join("<br>")}</td><td>${escapeHTML(sale.customerName)}<small>${escapeHTML(sale.phone||"Walk-in")}</small></td><td>${money(sale.total)}</td><td>${sale.due?`Credit · ${money(sale.due)} due`:escapeHTML(sale.paymentStatus||"Recorded locally")}<small>${sale.payments.map(payment=>`${escapeHTML(payment.method)}: ${payment.status==="awaiting_verification"?"unverified":"recorded"}`).join(" · ")}</small></td><td><button class="workspaceButton secondary" type="button" onclick="showPosReceipt('${escapeHTML(sale.id)}')">Receipt</button></td></tr>`).join(""):`<tr><td colspan="6"><div class="posEmpty">No sales recorded for this business yet.</div></td></tr>`}</tbody></table></div>`;
+}
+function renderPosOnlineOrders(){
+ const orders=getBusinessOnlineOrders(activePosShop).slice().sort((a,b)=>b.createdAt-a.createdAt);
+ return `<div class="workspacePageHead"><div><h2>Online orders</h2><p>Orders placed through this device's business storefront.</p></div><button class="workspaceButton secondary" type="button" onclick="openShopPreview(activePosShop)">Open store preview ↗</button></div><div class="workspaceNotice">Orders can only appear here when the storefront and POS share this browser database. No real-time sync, customer notification, or payment processing is connected.</div><div class="workspaceList" style="margin-top:12px">${orders.length?orders.map(order=>`<article class="workspaceListItem"><div><strong>${escapeHTML(order.id)} · ${money(order.total)}</strong><p>${escapeHTML(order.customerName)} · ${escapeHTML(order.phone)}<br>${order.lines.map(line=>`${escapeHTML(line.name)} × ${line.quantity}`).join(", ")}<br>${escapeHTML(order.fulfillment)} · ${new Date(order.createdAt).toLocaleString()}</p><span class="workspaceStatusPill${order.status==="New"?" warning":""}">${escapeHTML(order.status)}</span></div></article>`).join(""):`<div class="posEmpty">No online orders yet.</div>`}</div>`;
+}
+function shopSlug(name){return String(name).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")}
+function shopForSlug(slug){return getPosBusinessNames().find(name=>shopSlug(name)===slug)||null}
+function openShopPreview(shop){
+ if(!getPosBusinessNames().includes(shop)){toast("Business storefront is not available");return}
+ stopPosScanner();publicShopBusiness=shop;publicShopCart=[];publicShopForm={customerName:"",phone:"",fulfillment:"Pickup",address:""};
+ const route=new URL(`./shop/${shopSlug(shop)}`,location.href);
+ history.pushState({shopSlug:shopSlug(shop)},"",route.pathname);
+ showPublicStorefront(shop);
+}
+function closePublicStorefront(){
+ if(history.state?.shopSlug){history.back();return}
+ const parentRoute=new URL("../../",location.href);
+ history.replaceState(null,"",parentRoute.pathname);closeModal();document.title="Mbale Shopper — Compare. Choose. Shop.";
+}
+function showPublicStorefront(shop){
+ publicShopBusiness=shop;
+ document.title=`${shop} | Mbale Shopper`;
+ el("modal").innerHTML=`<div class="workspaceScreen publicStorefront" role="dialog" aria-modal="true" aria-label="${escapeHTML(shop)} storefront"><header class="workspaceHeader"><div class="workspaceBrand"><small>MBALE SHOPPER · LOCAL STORE</small><h1>${escapeHTML(shop)}</h1></div><span class="workspaceStatus">Store preview</span><button class="workspaceClose" type="button" aria-label="Close storefront" onclick="closePublicStorefront()">×</button></header><main class="workspaceBody" id="publicShopBody"></main></div>`;
+ el("modalWrap").classList.add("show");renderPublicStorefront();
+}
+function renderPublicStorefront(){
+ const body=el("publicShopBody");if(!body||!publicShopBusiness)return;
+ const items=products.filter(product=>product.shop===publicShopBusiness&&Number(product.price)>0&&currentPosStock(product.id)>0);
+ const total=publicShopCart.reduce((sum,item)=>sum+Number(products.find(product=>product.id===item.productId)?.price||0)*item.quantity,0);
+ const rows=publicShopCart.map((item,index)=>{const product=products.find(entry=>entry.id===item.productId);if(!product)return "";return `<div class="posCartRow"><strong>${escapeHTML(product.name)}</strong><span class="posCartRowTotal">${money(product.price*item.quantity)}</span><div class="posQuantity"><button type="button" onclick="changePublicShopQuantity(${index},-1)" aria-label="Remove one">−</button><span>${item.quantity}</span><button type="button" onclick="changePublicShopQuantity(${index},1)" aria-label="Add one">+</button></div></div>`}).join("");
+ body.innerHTML=`<div class="workspaceNotice"><strong>Storefront prototype.</strong> This route is generated from this business's active demo products. Orders are saved locally and are not sent to the shop.</div><div class="posSaleLayout" style="margin-top:14px"><section class="posCatalogPanel"><div class="workspacePageHead"><div><h2>Available products</h2><p>Availability reflects this browser's demo stock.</p></div></div><div class="posProductGrid">${items.length?items.map(product=>`<button class="posProductCard" type="button" onclick="addPublicShopItem(${product.id})"><img src="${escapeHTML(product.image)}" alt="" loading="lazy"><span class="posProductCopy"><strong>${escapeHTML(product.name)}</strong><span>${money(product.price)}</span><small>${currentPosStock(product.id)} available</small></span></button>`).join(""):`<div class="posEmpty">No active items are available right now.</div>`}</div></section><aside class="posCheckoutPanel"><div class="posCheckoutHead"><h2>Your order</h2><span>${publicShopCart.reduce((sum,item)=>sum+item.quantity,0)} items</span></div><div class="posCartRows">${rows||`<div class="posEmpty">Your order is empty.</div>`}</div><div class="posTotalRow"><span>Total</span><strong>${money(total)}</strong></div><form class="workspaceForm" style="grid-template-columns:1fr;padding:0;border:0" onsubmit="submitOnlineStoreOrder(event)"><label class="full">Your name<input name="customerName" value="${escapeHTML(publicShopForm.customerName)}" oninput="publicShopForm.customerName=this.value" required autocomplete="name"></label><label class="full">Phone number<input name="phone" type="tel" value="${escapeHTML(publicShopForm.phone)}" oninput="publicShopForm.phone=this.value" required autocomplete="tel"></label><label class="full">Fulfilment<select name="fulfillment" onchange="publicShopForm.fulfillment=this.value;renderPublicStorefront()"><option${publicShopForm.fulfillment==="Pickup"?" selected":""}>Pickup</option><option${publicShopForm.fulfillment==="Delivery"?" selected":""}>Delivery</option></select></label>${publicShopForm.fulfillment==="Delivery"?`<label class="full">Delivery address<textarea name="address" required oninput="publicShopForm.address=this.value">${escapeHTML(publicShopForm.address)}</textarea></label>`:""}<div class="full"><button class="posCompleteButton" type="submit" ${!publicShopCart.length?"disabled":""}>Place demo order · ${money(total)}</button></div></form><p class="workspaceHint">Payment is arranged with the seller; no payment is taken here.</p></aside></div>`;
+}
+function addPublicShopItem(productId){
+ const product=products.find(item=>item.id===Number(productId));if(!product||product.shop!==publicShopBusiness)return;
+ const current=publicShopCart.find(item=>item.productId===product.id);
+ if(currentPosStock(product.id)<(current?.quantity||0)+1){toast("This item has no more available stock");return}
+ if(current)current.quantity++;else publicShopCart.push({productId:product.id,quantity:1});renderPublicStorefront();
+}
+function changePublicShopQuantity(index,delta){
+ const item=publicShopCart[index];if(!item)return;
+ if(delta>0&&currentPosStock(item.productId)<item.quantity+1){toast("This item has no more available stock");return}
+ item.quantity+=delta;if(item.quantity<=0)publicShopCart.splice(index,1);renderPublicStorefront();
+}
+async function submitOnlineStoreOrder(event){
+ event.preventDefault();
+ if(!publicShopCart.length){toast("Add a product to your order first");return}
+ const form=new FormData(event.currentTarget),customerName=String(form.get("customerName")||"").trim(),phone=String(form.get("phone")||"").trim(),address=String(form.get("address")||"").trim(),fulfillment=String(form.get("fulfillment")||"Pickup"),digits=phone.replace(/\D/g,"");
+ if(!customerName||digits.length<9||digits.length>15){toast("Enter a name and a valid phone number");return}
+ if(fulfillment==="Delivery"&&!address){toast("Enter a delivery address");return}
+ const quantities=new Map();publicShopCart.forEach(item=>quantities.set(item.productId,(quantities.get(item.productId)||0)+item.quantity));
+ for(const [productId,quantity] of quantities){if(currentPosStock(productId)<quantity){toast(`${products.find(product=>product.id===productId)?.name||"Item"} is no longer available`);return}}
+ const lines=publicShopCart.map(item=>{const product=products.find(entry=>entry.id===item.productId);return {productId:product.id,name:product.name,quantity:item.quantity,unitPrice:Number(product.price),lineTotal:Number(product.price)*item.quantity}});
+ const order={id:`WEB-${Date.now().toString(36).toUpperCase()}`,business:publicShopBusiness,source:"online",createdAt:Date.now(),lines,total:lines.reduce((sum,line)=>sum+line.lineTotal,0),customerName,phone,fulfillment,address,status:"New",paymentStatus:"Awaiting payment",syncStatus:"pending_backend"};
+ try{
+  await storePosRecord("onlineOrders",order);onlineStoreOrders=mergePosRecords(onlineStoreOrders,[order]);
+  quantities.forEach((quantity,id)=>{const inventory=getProductInventory(id);sellerInventory[id]={stock:inventory.stock-quantity,sold:inventory.sold+quantity}});
+  try{saveSellerData()}catch(error){console.error("Online order saved but stock could not be mirrored",error);toast("Order saved locally; stock mirror could not be updated")}
+  persistPosMetadata();appendPosAudit("online_order_received",`${order.id} · ${money(order.total)}`,publicShopBusiness);updateWorkspaceConnection();
+  publicShopCart=[];publicShopForm={customerName:"",phone:"",fulfillment:"Pickup",address:""};renderPublicStorefront();toast("Order saved locally; the shop has not been notified");
+ }catch(error){console.error("Online order could not be saved",error);toast("Order was not saved; try again")}
+}
+function findShopRoute(){
+ const pathMatch=location.pathname.match(/\/shop\/([^/]+)\/?$/),hashMatch=location.hash.match(/^#shop\/([^/]+)$/),slug=pathMatch?.[1]||hashMatch?.[1];
+ if(!slug)return null;
+ try{return shopForSlug(decodeURIComponent(slug))}catch(error){console.error("Invalid storefront route",error);return null}
+}
+window.addEventListener("popstate",()=>{
+ const shop=findShopRoute();
+ if(shop){showPublicStorefront(shop);return}
+ if(el("modal")?.querySelector(".publicStorefront")){closeModal();document.title="Mbale Shopper — Compare. Choose. Shop."}
+});
+function renderPosCredit(){
+ const debts=getBusinessSales().filter(sale=>Number(sale.due)>0&&sale.status!=="Voided");
+ return `<div class="workspacePageHead"><div><h2>Credit ledger</h2><p>Outstanding balances from credit sales on this device.</p></div></div><div class="workspaceMetricGrid posMetricGrid"><article class="posMetric"><span>Customers owing</span><strong>${new Set(debts.map(sale=>sale.phone).filter(Boolean)).size}</strong><small>Local demo records</small></article><article class="posMetric"><span>Total outstanding</span><strong>${money(debts.reduce((sum,sale)=>sum+Number(sale.due),0))}</strong><small>Payment collection is not connected</small></article></div><div class="workspaceList">${debts.length?debts.map(sale=>`<article class="workspaceListItem"><div><strong>${escapeHTML(sale.customerName)} · ${money(sale.due)}</strong><p>${escapeHTML(sale.phone)} · Sale ${escapeHTML(sale.id)}<br>Due ${sale.dueAt?new Date(sale.dueAt).toLocaleDateString():"date not set"}</p><small>${sale.dueAt<Date.now()?"Overdue":"Outstanding"} · No reminder has been sent</small></div><button class="workspaceButton secondary" type="button" onclick="prepareDebtReminder('${escapeHTML(sale.id)}')">Prepare reminder</button></article>`).join(""):`<div class="posEmpty">No outstanding credit balances.</div>`}</div><p class="workspaceHint">WhatsApp/SMS delivery and payment links will be added with backend integrations.</p>`;
+}
+function renderPosInvoices(){
+ const invoices=invoiceRecords.filter(invoice=>invoice.business===activePosShop);
+ return `<div class="workspacePageHead"><div><h2>Upload supplier bill</h2><p>Capture a receipt or choose a photo/PDF for staff to review.</p></div></div><form class="workspaceForm" onsubmit="handleSupplierInvoice(event)"><label class="full">Supplier bill image or PDF<input name="invoice" type="file" accept="image/*,application/pdf" capture="environment" required></label><label>Supplier name<input name="supplier" maxlength="120" placeholder="Optional"></label><label>Invoice amount (UGX)<input name="amount" type="number" min="0" step="1" placeholder="Optional"></label><div class="full"><button class="workspaceButton primary" type="submit">Save bill offline</button></div></form><p class="workspaceHint">Files are stored in this browser's IndexedDB for the local demo. They are not uploaded or backed up. Maximum file size: 10 MB.</p><div class="workspaceSectionTitle"><h3>Submitted bills</h3></div><div class="workspaceList">${invoices.length?invoices.map(invoice=>`<article class="workspaceListItem"><div><strong>${escapeHTML(invoice.fileName)}</strong><p>${escapeHTML(invoice.supplier||"Supplier not entered")}${invoice.amount?` · ${money(invoice.amount)}`:""}<br>Captured ${new Date(invoice.createdAt).toLocaleString()}</p></div><span class="workspaceStatusPill${invoice.status==="Reviewed"?"":" warning"}">${escapeHTML(invoice.status)}</span></article>`).join(""):`<div class="posEmpty">No supplier bills uploaded.</div>`}</div>`;
+}
+async function handleSupplierInvoice(event){
+ event.preventDefault();
+ const form=event.currentTarget,file=form.elements.invoice.files[0],supplier=form.elements.supplier.value.trim(),amount=Number(form.elements.amount.value||0);
+ if(!file){toast("Choose a supplier bill first");return}
+ if(file.size>10*1024*1024){toast("Supplier bill must be 10 MB or smaller");return}
+ if(!Number.isInteger(amount)||amount<0){toast("Invoice amount must be a whole non-negative number of UGX");return}
+ if(!file.type.startsWith("image/")&&file.type!=="application/pdf"){toast("Choose an image or PDF file");return}
+ const invoice={id:`INV-${Date.now().toString(36).toUpperCase()}`,business:activePosShop,fileName:file.name,fileType:file.type,fileSize:file.size,file, supplier,amount,createdAt:Date.now(),status:"Pending staff review"};
+ try{
+  await storePosRecord("invoices",invoice);
+  invoiceRecords=mergePosRecords(invoiceRecords,[{...invoice,file:undefined}]);
+  persistPosMetadata();appendPosAudit("invoice_uploaded",`${invoice.fileName} · ${activePosShop}`,activePosShop);
+  renderOwnerPosSection();toast("Supplier bill saved on this device for staff review");
+ }catch(error){console.error("Supplier bill could not be saved in IndexedDB",error);toast("Bill was not saved. Check browser storage and try again")}
+}
+function renderOwnerAdvice(){
+ const tips=advisorSuggestions[activePosShop]||[],dismissed=dismissedAdvice[activePosShop]||[];
+ const visible=tips.filter(tip=>!dismissed.includes(tip.id));
+ return `<div class="workspacePageHead"><div><h2>Weekly advice</h2><p>Suggestions published by managed staff for your business.</p></div></div><div class="workspaceNotice">Advice is local demo content, not financial or tax guidance.</div><div class="workspaceList" style="margin-top:12px">${visible.length?visible.map(tip=>`<article class="workspaceListItem"><div><strong>${escapeHTML(tip.title)}</strong><p>${escapeHTML(tip.message)}</p><small>${new Date(tip.createdAt).toLocaleDateString()}</small></div><button class="workspaceButton secondary" type="button" onclick="dismissAdvice('${escapeHTML(tip.id)}')">Mark read</button></article>`).join(""):`<div class="posEmpty">No new suggestions for this business.</div>`}</div>`;
+}
+function showPosReceipt(saleId){
+ const sale=posSales.find(item=>item.id===saleId);if(!sale)return;
+ const unverified=sale.payments?.some(payment=>payment.status==="awaiting_verification");
+ const paymentLines=sale.payments?.length?sale.payments.map(payment=>`<div class="posReceiptLine"><span>${escapeHTML(payment.method)}${payment.status==="awaiting_verification"?" · unverified":payment.status==="manually_checked_demo"?" · manually checked":payment.status==="counted_locally"?" · counted locally":payment.status==="manually_recorded_demo"?" · manually recorded":""}</span><span>${money(payment.amount)}</span></div>`).join(""):"";
+ el("modal").innerHTML=`<div class="posReceiptPaper"><div class="posReceiptActions"><button class="workspaceButton secondary" type="button" onclick="closeModal()">Close</button><button class="workspaceButton primary" type="button" onclick="printPosReceipt()">Print receipt</button><button class="workspaceButton secondary" type="button" onclick="sharePosReceipt('${escapeHTML(sale.id)}')">Copy / share</button><label class="workspaceHint">Paper width <select onchange="document.querySelector('.posReceiptPaper').classList.toggle('wide',this.value==='80')"><option value="58">58 mm</option><option value="80">80 mm</option></select></label></div><h2>${escapeHTML(sale.business)}</h2><p>SALES RECEIPT · DEMO</p><hr><p>${escapeHTML(sale.id)}<br>${new Date(sale.createdAt).toLocaleString()}</p><hr>${sale.lines.map(line=>`<div class="posReceiptLine"><span>${escapeHTML(line.name)} × ${line.quantity}</span><strong>${money(line.lineTotal)}</strong></div>`).join("")}<hr><div class="posReceiptLine"><strong>Total</strong><strong>${money(sale.total)}</strong></div>${paymentLines}${sale.due?`<div class="posReceiptLine"><strong>Credit balance due</strong><strong>${money(sale.due)}</strong></div>`:""}${unverified?`<p class="posReceiptVerification">Transfer/card payment is recorded but not verified or processed.</p>`:""}<p>Customer: ${escapeHTML(sale.customerName)}${sale.phone?`<br>${escapeHTML(sale.phone)}`:""}</p><div class="posReceiptFooter">Thank you · Not a tax invoice<br>Stored on this device only</div></div>`;
+ el("modalWrap").classList.add("show");
+}
+function printPosReceipt(){document.body.classList.add("printingPosReceipt");window.print();setTimeout(()=>document.body.classList.remove("printingPosReceipt"),500)}
+async function sharePosReceipt(saleId){
+ const sale=posSales.find(item=>item.id===saleId);if(!sale)return;
+ const url=new URL(`./shop/${shopSlug(sale.business)}`,location.href).href;
+ const text=`Receipt ${sale.id} from ${sale.business}\n${sale.lines.map(line=>`${line.name} × ${line.quantity}: ${money(line.lineTotal)}`).join("\n")}\nTotal: ${money(sale.total)}\nAmount recorded: ${money(sale.paid)}${sale.paymentStatus==="Awaiting verification"?" (transfer/card unverified)":""}${sale.due?`\nCredit balance due: ${money(sale.due)}`:""}`;
+ try{
+  if(navigator.share){await navigator.share({title:`Receipt ${sale.id}`,text,url});toast("Receipt shared using your device's share sheet")}
+  else{await navigator.clipboard.writeText(`${text}\nShop: ${url}`);toast("Receipt text and shop link copied")}
+ }catch(error){if(error.name!=="AbortError"){console.error("Receipt sharing failed",error);toast("Could not share receipt; use print or try copying it")}}
+}
+function prepareDebtReminder(saleId){
+ const sale=posSales.find(item=>item.id===saleId);if(!sale)return;
+ const message=`Hello ${sale.customerName}, this is a reminder from ${sale.business} about your outstanding balance of ${money(sale.due)} for sale ${sale.id}. Please contact the shop to arrange payment.`;
+ el("modal").innerHTML=`<button class="close" type="button" onclick="closeModal()">×</button><div class="form"><h2>Prepare debt reminder</h2><p>Nothing will be sent until messaging integrations are connected.</p><label>Phone<input readonly value="${escapeHTML(sale.phone)}"></label><label>Message<textarea id="debtReminderMessage" readonly rows="5">${escapeHTML(message)}</textarea></label><button class="workspaceButton primary" type="button" onclick="copyDebtReminder()">Copy reminder text</button></div>`;
+ el("modalWrap").classList.add("show");
+}
+async function copyDebtReminder(){
+ const text=el("debtReminderMessage")?.value;if(!text)return;
+ try{await navigator.clipboard.writeText(text);toast("Reminder text copied; it was not sent")}catch(error){console.error("Could not copy reminder text",error);toast("Copy failed; select the reminder text and copy it manually")}
+}
+function showManagedStaff(section="overview"){
+ if(!getPosBusinessNames().includes(activeManagedShop))activeManagedShop=getPosBusinessNames()[0];
+ managedStaffSection=section;
+ el("modal").innerHTML=`<div class="workspaceScreen" role="dialog" aria-modal="true" aria-label="Managed staff operations">${workspaceHeader("Staff operations",activeManagedShop,"switchManagedBusiness",true)}<nav class="workspaceTabs" aria-label="Managed staff sections">${[["overview","Overview"],["catalog","Catalog & stock"],["online","Online orders"],["invoices","Supplier bills"],["debts","Debts"],["payments","Payment review"],["audit","Audit & alerts"],["reports","Reports"],["advice","Weekly advice"]].map(([key,label])=>`<button class="workspaceTab${managedStaffSection===key?" active":""}" type="button" onclick="showManagedStaff('${key}')">${label}${key==="online"&&getBusinessOnlineOrders(activeManagedShop).some(order=>order.status==="New")?` <span class="workspaceStatusPill warning">${getBusinessOnlineOrders(activeManagedShop).filter(order=>order.status==="New").length}</span>`:key==="payments"&&getBusinessSales(activeManagedShop).some(sale=>sale.payments?.some(payment=>payment.status==="awaiting_verification"))?` <span class="workspaceStatusPill warning">${getBusinessSales(activeManagedShop).filter(sale=>sale.payments?.some(payment=>payment.status==="awaiting_verification")).length}</span>`:""}</button>`).join("")}</nav><main class="workspaceBody" id="managedStaffBody"></main></div>`;
+ el("modalWrap").classList.add("show");
+ renderManagedStaffSection();
+ hydratePosData().then(()=>{if(el("managedStaffBody"))renderManagedStaffSection()});
+}
+function switchManagedBusiness(shop){activeManagedShop=shop;localStorage.setItem("mbaleManagedShop",shop);showManagedStaff(managedStaffSection)}
+function renderManagedStaffSection(){
+ const body=el("managedStaffBody");if(!body)return;
+ const renderers={overview:renderStaffOverview,catalog:renderStaffCatalog,online:renderStaffOnlineOrders,invoices:renderStaffInvoices,debts:renderStaffDebts,payments:renderStaffPaymentReview,audit:renderStaffAudit,reports:renderStaffReports,advice:renderStaffAdvice};
+ body.innerHTML=(renderers[managedStaffSection]||renderStaffOverview)();
+}
+function getStaffAlerts(shop=activeManagedShop){
+ const sales=getBusinessSales(shop),activeSales=sales.filter(sale=>sale.status!=="Voided"),items=products.filter(product=>product.shop===shop);
+ const alerts=[];
+ items.filter(product=>currentStockForShop(product.id)<=5).forEach(product=>alerts.push({type:"warning",title:`Low stock: ${product.name}`,detail:`${currentStockForShop(product.id)} units remain.`}));
+ activeSales.forEach(sale=>sale.lines.forEach(line=>{if(line.costPrice>0&&line.unitPrice<line.costPrice)alerts.push({type:"danger",title:`Sold below cost: ${line.name}`,detail:`${sale.id} sold at ${money(line.unitPrice)}; recorded cost ${money(line.costPrice)}.`})}));
+ activeSales.filter(sale=>sale.due>0&&sale.dueAt<Date.now()).forEach(sale=>alerts.push({type:"danger",title:`Overdue balance: ${sale.customerName}`,detail:`${sale.id} · ${money(sale.due)} overdue.`}));
+ sales.filter(sale=>sale.status==="Voided").forEach(sale=>alerts.push({type:"warning",title:`Voided sale: ${sale.id}`,detail:"Review the local audit entry."}));
+ const recentVoids=sales.filter(sale=>sale.status==="Voided"&&Number(sale.voidedAt||0)>Date.now()-24*60*60*1000);
+ if(recentVoids.length>=3)alerts.push({type:"danger",title:"Frequent voided sales",detail:`${recentVoids.length} sales were voided in the last 24 hours.`});
+ getBusinessOnlineOrders(shop).filter(order=>order.status==="New").forEach(order=>alerts.push({type:"warning",title:`New online order: ${order.id}`,detail:`${order.customerName} · ${money(order.total)} · needs fulfilment.`}));
+ return alerts;
+}
+function currentStockForShop(productId){return Number(sellerInventory[productId]?.stock??getProductInventory(productId).stock??0)}
+function renderStaffOverview(){
+ const sales=getBusinessSales(activeManagedShop).filter(sale=>sale.status!=="Voided"),alerts=getStaffAlerts(),today=new Date().toDateString();
+ const todaySales=sales.filter(sale=>new Date(sale.createdAt).toDateString()===today),revenue=todaySales.reduce((sum,sale)=>sum+sale.total,0),debts=sales.reduce((sum,sale)=>sum+Number(sale.due||0),0),pendingInvoices=invoiceRecords.filter(invoice=>invoice.business===activeManagedShop&&invoice.status!=="Reviewed").length;
+ return `<div class="workspaceNotice"><strong>Prototype only.</strong> Staff access, business isolation, approval controls, immutable audit logs, and reports are not enforced or backed up by a server.</div><div class="workspacePageHead" style="margin-top:14px"><div><h2>Business overview</h2><p>Local operations snapshot for ${escapeHTML(activeManagedShop)}.</p></div></div><div class="posMetricGrid"><article class="posMetric"><span>Today's POS sales</span><strong>${money(revenue)}</strong><small>${todaySales.length} local transactions</small></article><article class="posMetric"><span>Products</span><strong>${products.filter(product=>product.shop===activeManagedShop).length}</strong><small>Active demo catalog</small></article><article class="posMetric"><span>Outstanding credit</span><strong>${money(debts)}</strong><small>Collection integration not connected</small></article><article class="posMetric"><span>Supplier bills to review</span><strong>${pendingInvoices}</strong><small>Stored on this browser</small></article></div><div class="workspaceSectionTitle"><h3>Industry setup</h3></div><form class="workspaceForm" onsubmit="saveBusinessIndustry(event)"><label>Business type<select name="industry">${industryTemplates.map(template=>`<option value="${template.id}"${(businessIndustries[activeManagedShop]||"Grocery")===template.id?" selected":""}>${template.label}</option>`).join("")}</select></label><div style="align-self:end"><button class="workspaceButton primary" type="submit">Save template</button></div></form><p class="workspaceHint">Templates filter the sample master catalog; they do not represent a complete or verified product database.</p><div class="workspaceSectionTitle"><h3>Attention needed</h3><button class="workspaceButton secondary" type="button" onclick="showManagedStaff('audit')">Open audit & alerts</button></div><div class="workspaceList">${alerts.length?alerts.slice(0,5).map(alert=>`<article class="workspaceListItem"><div><strong>${escapeHTML(alert.title)}</strong><p>${escapeHTML(alert.detail)}</p></div><span class="workspaceStatusPill ${alert.type}">${alert.type==="danger"?"Review":"Notice"}</span></article>`).join(""):`<div class="posEmpty">No current demo alerts.</div>`}</div>`;
+}
+function saveBusinessIndustry(event){
+ event.preventDefault();businessIndustries[activeManagedShop]=event.currentTarget.elements.industry.value;
+ if(!writePosLocal("mbaleBusinessIndustries",businessIndustries)){toast("Business template could not be saved");return}
+ appendPosAudit("industry_template_updated",businessIndustries[activeManagedShop],activeManagedShop);renderManagedStaffSection();toast("Business template saved on this device");
+}
+function renderStaffCatalog(){
+ const items=products.filter(product=>product.shop===activeManagedShop).slice().sort((a,b)=>a.name.localeCompare(b.name));
+ const template=industryTemplates.find(item=>item.id===(businessIndustries[activeManagedShop]||"Grocery"))||industryTemplates[0];
+ const masterItems=products.filter(product=>product.shop!==activeManagedShop&&template.categories.includes(product.cat)).slice(0,60);
+ return `<div class="workspacePageHead"><div><h2>Catalog & stock</h2><p>Set sell price, internal buying cost, stock and barcode for ${escapeHTML(activeManagedShop)}.</p></div></div><div class="workspaceNotice">These edits affect this browser's demo catalog only. Master catalog entries are sample marketplace products; confirm all details before using real stock.</div><div class="workspaceSectionTitle"><h3>Business products (${items.length})</h3></div><div class="workspaceTableWrap"><table class="workspaceTable"><thead><tr><th>Product</th><th>Sell price</th><th>Buying cost</th><th>Stock</th><th>Barcode</th><th></th></tr></thead><tbody>${items.length?items.map(product=>{const stock=currentStockForShop(product.id),cost=getManagedCost(product.id,activeManagedShop),formId=`managedProduct-${product.id}`;return `<tr><td class="workspaceTableProduct"><form id="${formId}" onsubmit="saveManagedProduct(event,${product.id})"></form><strong>${escapeHTML(product.name)}</strong><small>${escapeHTML(product.cat)}</small></td><td><input form="${formId}" name="selling" type="number" min="0" step="1" value="${product.price||""}" aria-label="Selling price for ${escapeHTML(product.name)}"></td><td><input form="${formId}" name="cost" type="number" min="0" step="1" value="${cost||""}" aria-label="Buying price for ${escapeHTML(product.name)}"></td><td><input form="${formId}" name="stock" type="number" min="0" step="1" value="${stock}" aria-label="Stock quantity for ${escapeHTML(product.name)}"></td><td><input form="${formId}" name="barcode" maxlength="80" value="${escapeHTML(product.barcode||"")}" aria-label="Barcode for ${escapeHTML(product.name)}"></td><td><button form="${formId}" class="workspaceButton secondary" type="submit">Save</button></td></tr>`}).join(""):`<tr><td colspan="6">No products in this business catalog.</td></tr>`}</tbody></table></div><div class="workspaceSectionTitle"><h3>Activate from ${template.label} template</h3></div><div class="workspaceList">${masterItems.length?masterItems.map(product=>`<article class="workspaceListItem"><div><strong>${escapeHTML(product.name)}</strong><p>${escapeHTML(product.cat)} · Sample master product<br>Price is unset and stock starts at zero.</p></div><button class="workspaceButton primary" type="button" onclick="activateMasterProduct(${product.id})">Add to business</button></article>`).join(""):`<div class="posEmpty">No sample products available for this template.</div>`}</div>`;
+}
+function saveManagedProduct(event,productId){
+ event.preventDefault();
+ const product=products.find(item=>item.id===Number(productId));if(!product||product.shop!==activeManagedShop){toast("Product does not belong to the selected business");return}
+ const form=new FormData(event.currentTarget),selling=Number(form.get("selling")||0),cost=Number(form.get("cost")||0),stock=Number(form.get("stock")),barcode=String(form.get("barcode")||"").trim();
+ if(!Number.isInteger(selling)||selling<0||!Number.isInteger(cost)||cost<0||!Number.isInteger(stock)||stock<0){toast("Enter whole-number non-negative prices and stock quantities");return}
+ const previousProduct={price:product.price,old:product.old,barcode:product.barcode},previousInventory=sellerInventory[product.id]?{...sellerInventory[product.id]}:undefined,previousOverride=sellerProductOverrides[product.id],previousCosts=managedCostOverrides;
+ const nextCosts={...managedCostOverrides,[`${activeManagedShop}::${product.id}`]:cost};
+ if(!writePosLocal("mbaleManagedCosts",nextCosts)){toast("Product edit was not saved");return}
+ managedCostOverrides=nextCosts;
+ product.price=selling;product.old=Math.max(Number(product.old)||0,selling);product.barcode=barcode;
+ sellerProductOverrides[product.id]={name:product.name,cat:product.cat,price:product.price,old:product.old,desc:product.desc,image:product.image,barcode};
+ sellerInventory[product.id]={stock,sold:getProductInventory(product.id).sold||0};
+ try{saveSellerData()}catch(error){
+  Object.assign(product,previousProduct);if(previousOverride)sellerProductOverrides[product.id]=previousOverride;else delete sellerProductOverrides[product.id];
+  if(previousInventory)sellerInventory[product.id]=previousInventory;else delete sellerInventory[product.id];
+  managedCostOverrides=previousCosts;writePosLocal("mbaleManagedCosts",managedCostOverrides);
+  try{saveSellerData()}catch(restoreError){console.error("Could not restore local product data",restoreError)}
+  console.error("Product edit could not be saved",error);toast("Product edit was not saved");return;
+ }
+ appendPosAudit("product_updated",`${product.name} · sell ${selling} · cost ${cost} · stock ${stock}`,activeManagedShop);
+ renderCatalogFilters();initSellerFilter();renderCatalog();renderDeals();renderRecommendations();renderManagedStaffSection();toast("Product details saved on this device");
+}
+function activateMasterProduct(masterId){
+ const master=products.find(item=>item.id===Number(masterId));if(!master)return;
+ if(products.some(item=>item.shop===activeManagedShop&&item.name.toLowerCase()===master.name.toLowerCase())){toast("This product is already in the business catalog");return}
+ const id=Math.max(0,...products.map(item=>Number(item.id)||0))+1;
+ const listing={...master,id,shop:activeManagedShop,price:0,old:0,buyingPrice:0,barcode:"",rating:0,reviews:0,tag:"NEW"};
+ products.push(listing);sellerListings.push(listing);sellerInventory[id]={stock:0,sold:0};productGalleryImages.set(id,[listing.image]);
+ try{saveSellerData()}catch(error){products.splice(products.indexOf(listing),1);sellerListings=sellerListings.filter(item=>item.id!==id);delete sellerInventory[id];productGalleryImages.delete(id);console.error("Catalog activation could not be saved",error);toast("Product was not added");return}
+ appendPosAudit("master_product_activated",listing.name,activeManagedShop);renderManagedStaffSection();toast("Product added; set its price and stock before selling");
+}
+function renderStaffInvoices(){
+ const invoices=invoiceRecords.filter(invoice=>invoice.business===activeManagedShop).sort((a,b)=>b.createdAt-a.createdAt);
+ return `<div class="workspacePageHead"><div><h2>Supplier bills</h2><p>Review files captured by the owner on this device.</p></div></div><div class="workspaceNotice">Invoice OCR, purchase entry, approval controls, and secure file storage require the backend phase. Marking reviewed here does not update stock or accounts.</div><div class="workspaceList" style="margin-top:12px">${invoices.length?invoices.map(invoice=>`<article class="workspaceListItem"><div><strong>${escapeHTML(invoice.fileName)}</strong><p>${escapeHTML(invoice.supplier||"Supplier not entered")}${invoice.amount?` · ${money(invoice.amount)}`:""}<br>${new Date(invoice.createdAt).toLocaleString()} · ${(invoice.fileSize/1024).toFixed(0)} KB</p><small>${escapeHTML(invoice.status)}</small></div><div style="display:grid;gap:7px"><button class="workspaceButton secondary" type="button" onclick="viewSupplierInvoice('${escapeHTML(invoice.id)}')">View file</button>${invoice.status!=="Reviewed"?`<button class="workspaceButton primary" type="button" onclick="markInvoiceReviewed('${escapeHTML(invoice.id)}')">Mark reviewed</button>`:""}</div></article>`).join(""):`<div class="posEmpty">No supplier bills for this business.</div>`}</div>`;
+}
+function renderStaffOnlineOrders(){
+ const orders=getBusinessOnlineOrders(activeManagedShop).slice().sort((a,b)=>b.createdAt-a.createdAt);
+ const states=["New","Confirmed","Preparing","Ready for pickup","Completed","Cancelled"];
+ return `<div class="workspacePageHead"><div><h2>Online orders</h2><p>Review and update orders from the storefront prototype.</p></div></div><div class="workspaceNotice">Orders are local to this browser. Stock changes are reflected locally, but customers are not notified and payment status is not verified.</div><div class="workspaceTableWrap" style="margin-top:12px"><table class="workspaceTable"><thead><tr><th>Order</th><th>Items</th><th>Customer</th><th>Total</th><th>Fulfilment</th><th>Status</th></tr></thead><tbody>${orders.length?orders.map(order=>`<tr><td><strong>${escapeHTML(order.id)}</strong><small>${new Date(order.createdAt).toLocaleString()}</small></td><td>${order.lines.map(line=>`${escapeHTML(line.name)} × ${line.quantity}`).join("<br>")}</td><td>${escapeHTML(order.customerName)}<small>${escapeHTML(order.phone)}</small></td><td>${money(order.total)}</td><td>${escapeHTML(order.fulfillment)}<small>${escapeHTML(order.address||"")}</small></td><td><select aria-label="Status for ${escapeHTML(order.id)}" onchange="updateOnlineOrderStatus('${escapeHTML(order.id)}',this.value)">${states.map(status=>`<option${order.status===status?" selected":""}>${status}</option>`).join("")}</select></td></tr>`).join(""):`<tr><td colspan="6"><div class="posEmpty">No online orders for this business.</div></td></tr>`}</tbody></table></div>`;
+}
+async function updateOnlineOrderStatus(orderId,status){
+ const order=onlineStoreOrders.find(item=>item.id===orderId&&item.business===activeManagedShop);
+ if(!order||!["New","Confirmed","Preparing","Ready for pickup","Completed","Cancelled"].includes(status)){toast("Order status is invalid");return}
+ const previousStatus=order.status,previousUpdatedAt=order.updatedAt;
+ if(previousStatus==="Cancelled"&&status!=="Cancelled"){
+  for(const line of order.lines){if(currentStockForShop(line.productId)<line.quantity){toast(`${line.name} no longer has enough stock to reopen this order`);return}}
+ }
+ order.status=status;order.updatedAt=Date.now();
+ try{
+  await storePosRecord("onlineOrders",order);
+  if(previousStatus!=="Cancelled"&&status==="Cancelled")order.lines.forEach(line=>{const inventory=getProductInventory(line.productId);sellerInventory[line.productId]={stock:inventory.stock+line.quantity,sold:Math.max(0,inventory.sold-line.quantity)}});
+  if(previousStatus==="Cancelled"&&status!=="Cancelled")order.lines.forEach(line=>{const inventory=getProductInventory(line.productId);sellerInventory[line.productId]={stock:inventory.stock-line.quantity,sold:inventory.sold+line.quantity}});
+  if(previousStatus!==status){saveSellerData();appendPosAudit("online_order_status_updated",`${order.id}: ${previousStatus} → ${status}`,activeManagedShop)}
+  persistPosMetadata();renderCatalog();renderManagedStaffSection();toast("Order status updated locally");
+ }catch(error){order.status=previousStatus;order.updatedAt=previousUpdatedAt;console.error("Online order status could not be saved",error);toast("Order status was not saved")}
+}
+async function viewSupplierInvoice(invoiceId){
+ try{
+  const records=await posDbRequest("invoices","getAll"),invoice=records.find(item=>item.id===invoiceId);
+  if(!invoice?.file){toast("Invoice file is not available in this browser's offline database");return}
+  if(activeInvoiceObjectURL)URL.revokeObjectURL(activeInvoiceObjectURL);
+  activeInvoiceObjectURL=URL.createObjectURL(invoice.file);
+  const preview=invoice.fileType.startsWith("image/")?`<img class="posInvoicePreview" src="${activeInvoiceObjectURL}" alt="${escapeHTML(invoice.fileName)}">`:`<iframe title="${escapeHTML(invoice.fileName)}" src="${activeInvoiceObjectURL}" style="width:100%;height:65vh;border:0"></iframe>`;
+  el("modal").innerHTML=`<div class="form"><h2>${escapeHTML(invoice.fileName)}</h2>${preview}<button class="workspaceButton secondary" type="button" onclick="closeInvoicePreview()">Close</button></div>`;
+ }catch(error){console.error("Could not load supplier bill",error);toast("Could not open the supplier bill")}
+}
+function closeInvoicePreview(){if(activeInvoiceObjectURL)URL.revokeObjectURL(activeInvoiceObjectURL);activeInvoiceObjectURL=null;showManagedStaff("invoices")}
+async function markInvoiceReviewed(invoiceId){
+ const invoice=invoiceRecords.find(item=>item.id===invoiceId);if(!invoice)return;
+ try{
+  const records=await posDbRequest("invoices","getAll"),stored=records.find(item=>item.id===invoiceId);
+  if(!stored){toast("Invoice file is not available in IndexedDB");return}
+  stored.status="Reviewed";await posDbRequest("invoices","put",stored);invoice.status="Reviewed";
+  persistPosMetadata();appendPosAudit("invoice_reviewed",invoice.fileName,activeManagedShop);renderManagedStaffSection();toast("Bill marked reviewed locally");
+ }catch(error){console.error("Invoice status could not be saved",error);toast("Review status was not saved")}
+}
+function renderStaffDebts(){
+ const debts=getBusinessSales(activeManagedShop).filter(sale=>sale.due>0&&sale.status!=="Voided");
+ return `<div class="workspacePageHead"><div><h2>Debt collection</h2><p>Review outstanding customer balances.</p></div></div><div class="workspaceNotice">No reminders or payment links are sent. Payment callbacks and automatic debt clearing need backend and payment integrations.</div><div class="workspaceMetricGrid posMetricGrid"><article class="posMetric"><span>Open accounts</span><strong>${debts.length}</strong><small>Local POS credit sales</small></article><article class="posMetric"><span>Outstanding balance</span><strong>${money(debts.reduce((sum,sale)=>sum+sale.due,0))}</strong><small>Not reconciled</small></article></div><div class="workspaceList">${debts.length?debts.map(sale=>`<article class="workspaceListItem"><div><strong>${escapeHTML(sale.customerName)} · ${money(sale.due)}</strong><p>${escapeHTML(sale.phone)} · ${escapeHTML(sale.id)}<br>${sale.dueAt<Date.now()?"Overdue":"Due"} ${new Date(sale.dueAt).toLocaleDateString()}</p><small>${escapeHTML(sale.business)}</small></div><div style="display:grid;gap:7px"><button class="workspaceButton secondary" type="button" onclick="prepareDebtReminder('${escapeHTML(sale.id)}')">Prepare message</button><button class="workspaceButton primary" type="button" onclick="markDebtPaid('${escapeHTML(sale.id)}')">Mark paid (demo)</button></div></article>`).join(""):`<div class="posEmpty">No outstanding debts.</div>`}</div>`;
+}
+function renderStaffPaymentReview(){
+ const sales=getBusinessSales(activeManagedShop).filter(sale=>sale.status!=="Voided"&&sale.payments?.some(payment=>payment.status==="awaiting_verification")).sort((a,b)=>b.createdAt-a.createdAt);
+ return `<div class="workspacePageHead"><div><h2>Payment review</h2><p>Transfer/card entries recorded by the owner POS.</p></div></div><div class="workspaceNotice"><strong>Manual review only.</strong> The app cannot verify transactions with a bank or payment provider. Only mark an entry after independently checking the payment record; the action is saved on this browser and does not guarantee settlement.</div><div class="workspaceList" style="margin-top:12px">${sales.length?sales.map(sale=>`<article class="workspaceListItem"><div><strong>${escapeHTML(sale.id)} · ${escapeHTML(sale.customerName)}</strong><p>${escapeHTML(sale.phone||"No phone")} · ${money(sale.total)}<br>${sale.payments.filter(payment=>payment.status==="awaiting_verification").map(payment=>`${escapeHTML(payment.method)}: ${money(payment.amount)}`).join(", ")}<br>${new Date(sale.createdAt).toLocaleString()}</p></div><button class="workspaceButton secondary" type="button" onclick="verifyDemoSalePayment('${escapeHTML(sale.id)}')">Mark checked (demo)</button></article>`).join(""):`<div class="posEmpty">No transfer/card entries awaiting review.</div>`}</div>`;
+}
+async function verifyDemoSalePayment(saleId){
+ const sale=posSales.find(item=>item.id===saleId&&item.business===activeManagedShop);
+ if(!sale||!sale.payments?.some(payment=>payment.status==="awaiting_verification"))return;
+ if(!confirm("Have you independently checked that this transfer/card payment was received? This records your demo confirmation only; no provider is contacted."))return;
+ const previousPayments=sale.payments.map(payment=>({...payment})),previousStatus=sale.paymentStatus;
+ sale.payments=sale.payments.map(payment=>payment.status==="awaiting_verification"?{...payment,status:"manually_checked_demo",verifiedAt:Date.now()}:payment);
+ sale.paymentStatus="Recorded locally · staff checked";
+ try{
+  await storePosRecord("sales",sale);persistPosMetadata();appendPosAudit("payment_manually_checked",`${sale.id} · staff demo confirmation`,activeManagedShop);renderManagedStaffSection();toast("Demo confirmation saved locally; no payment provider was checked");
+ }catch(error){sale.payments=previousPayments;sale.paymentStatus=previousStatus;console.error("Payment review could not be saved",error);toast("Payment review was not saved")}
+}
+async function markDebtPaid(saleId){
+ const sale=posSales.find(item=>item.id===saleId&&item.business===activeManagedShop);if(!sale||!sale.due)return;
+ if(!confirm(`Mark ${money(sale.due)} as paid in this local demo?`))return;
+ const previous={paid:sale.paid,due:sale.due,dueAt:sale.dueAt,paymentStatus:sale.paymentStatus,payments:sale.payments};
+ const amountCollected=Number(sale.due);sale.paid=Number(sale.paid||0)+amountCollected;sale.due=0;sale.payments=[...(sale.payments||[]),{method:"Manual staff settlement · demo",amount:amountCollected,status:"manually_recorded_demo"}];sale.dueAt=null;sale.paymentStatus="Credit settled locally · unverified";
+ try{await storePosRecord("sales",sale);persistPosMetadata();appendPosAudit("debt_marked_paid",`${sale.id} · manual demo action`,activeManagedShop);renderManagedStaffSection();toast("Debt marked paid locally; no payment was verified")}
+ catch(error){Object.assign(sale,previous);console.error("Debt change could not be saved",error);toast("Debt was not updated")}
+}
+function renderStaffAudit(){
+ const alerts=getStaffAlerts(),events=posAuditEntries.filter(entry=>entry.business===activeManagedShop).slice().sort((a,b)=>b.createdAt-a.createdAt),sales=getBusinessSales(activeManagedShop).slice().sort((a,b)=>b.createdAt-a.createdAt);
+ return `<div class="workspacePageHead"><div><h2>Audit & anomaly alerts</h2><p>Heuristic checks over local demo records.</p></div></div><div class="workspaceNotice">This browser log is editable and is not an immutable audit trail. Production audit events must be server-generated and append-only. A demo void restores stock but does not refund or reverse an actual payment.</div><div class="workspaceSectionTitle"><h3>Alerts (${alerts.length})</h3></div><div class="workspaceList">${alerts.length?alerts.map(alert=>`<article class="workspaceListItem"><div><strong>${escapeHTML(alert.title)}</strong><p>${escapeHTML(alert.detail)}</p></div><span class="workspaceStatusPill ${alert.type}">${alert.type==="danger"?"Review":"Notice"}</span></article>`).join(""):`<div class="posEmpty">No current anomalies detected.</div>`}</div><div class="workspaceSectionTitle"><h3>Sales requiring review</h3></div><div class="workspaceTableWrap"><table class="workspaceTable"><thead><tr><th>Receipt</th><th>Customer</th><th>Total</th><th>Status</th><th>Action</th></tr></thead><tbody>${sales.length?sales.slice(0,40).map(sale=>`<tr><td>${escapeHTML(sale.id)}<small>${new Date(sale.createdAt).toLocaleString()}</small></td><td>${escapeHTML(sale.customerName)}</td><td>${money(sale.total)}</td><td>${escapeHTML(sale.status)}</td><td>${sale.status==="Voided"?"—":`<button class="workspaceButton secondary" type="button" onclick="voidPosSale('${escapeHTML(sale.id)}')">Void demo sale</button>`}</td></tr>`).join(""):`<tr><td colspan="5">No local POS sales.</td></tr>`}</tbody></table></div><div class="workspaceSectionTitle"><h3>Recent local activity</h3></div><div class="workspaceList">${events.length?events.map(entry=>`<article class="workspaceListItem"><div><strong>${escapeHTML(entry.action)}</strong><p>${escapeHTML(entry.detail)}</p><small>${new Date(entry.createdAt).toLocaleString()} · ${escapeHTML(entry.actor)}</small></div></article>`).join(""):`<div class="posEmpty">No local audit events yet.</div>`}</div>`;
+}
+async function voidPosSale(saleId){
+ const sale=posSales.find(item=>item.id===saleId&&item.business===activeManagedShop&&item.status!=="Voided");
+ if(!sale)return;
+ const reason=prompt(`Reason for voiding ${sale.id}?`);if(!reason?.trim())return;
+ if(!confirm(`Void ${sale.id}? This demo restores stock but does not refund any real payment.`))return;
+ const previousStatus=sale.status,previousDue=sale.due,previousDueAt=sale.dueAt;
+ sale.status="Voided";sale.due=0;sale.dueAt=null;sale.voidedAt=Date.now();sale.voidReason=reason.trim();
+ try{
+  await storePosRecord("sales",sale);
+  sale.lines.forEach(line=>{const inventory=getProductInventory(line.productId);sellerInventory[line.productId]={stock:inventory.stock+line.quantity,sold:Math.max(0,inventory.sold-line.quantity)}});
+  saveSellerData();persistPosMetadata();appendPosAudit("sale_voided",`${sale.id} · ${reason.trim()}`,activeManagedShop);
+  renderCatalog();renderManagedStaffSection();toast("Demo sale voided; stock restored locally");
+ }catch(error){sale.status=previousStatus;sale.due=previousDue;sale.dueAt=previousDueAt;console.error("Sale could not be voided",error);toast("Sale was not voided")}
+}
+function renderStaffReports(){
+ const sales=getBusinessSales(activeManagedShop).filter(sale=>sale.status!=="Voided"),today=new Date().toDateString(),todaySales=sales.filter(sale=>new Date(sale.createdAt).toDateString()===today);
+ const revenue=sales.reduce((sum,sale)=>sum+Number(sale.total||0),0),recorded=sales.reduce((sum,sale)=>sum+Number(sale.paid||0),0),unverified=sales.reduce((sum,sale)=>sum+(sale.payments||[]).filter(payment=>payment.status==="awaiting_verification").reduce((amount,payment)=>amount+Number(payment.amount||0),0),0),cost=sales.reduce((sum,sale)=>sum+sale.lines.reduce((lineSum,line)=>lineSum+Number(line.costPrice||0)*line.quantity,0),0),hasCost=sales.some(sale=>sale.lines.some(line=>line.costPrice>0));
+ return `<div class="workspacePageHead"><div><h2>Reports</h2><p>Basic local POS summaries; not audited financial statements or tax reports.</p></div></div><div class="workspaceNotice">Profit is only an estimate where buying costs have been entered. Transfer/card entries are not verified; tax rules, expenses, refunds, inventory valuation, and reconciliation are excluded.</div><div class="posMetricGrid"><article class="posMetric"><span>Sales today (recorded)</span><strong>${money(todaySales.reduce((sum,sale)=>sum+sale.total,0))}</strong><small>${todaySales.length} transactions</small></article><article class="posMetric"><span>Total recorded sales</span><strong>${money(revenue)}</strong><small>${sales.length} transactions</small></article><article class="posMetric"><span>Amount entered at checkout</span><strong>${money(recorded)}</strong><small>${money(unverified)} transfer/card unverified</small></article><article class="posMetric"><span>Estimated gross margin</span><strong>${money(revenue-cost)}</strong><small>${hasCost?"Based on entered product costs":"Buying costs not entered"}</small></article></div><div class="workspaceSectionTitle"><h3>Recent transaction totals</h3></div><div class="workspaceTableWrap"><table class="workspaceTable"><thead><tr><th>Date</th><th>Receipt</th><th>Sale</th><th>Amount entered</th><th>Payment status</th></tr></thead><tbody>${sales.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,30).map(sale=>`<tr><td>${new Date(sale.createdAt).toLocaleDateString()}</td><td>${escapeHTML(sale.id)}</td><td>${money(sale.total)}</td><td>${money(sale.paid)}</td><td>${escapeHTML(sale.paymentStatus||"Recorded locally")}</td></tr>`).join("")||`<tr><td colspan="5">No local sales yet.</td></tr>`}</tbody></table></div>`;
+}
+function renderStaffAdvice(){
+ const tips=advisorSuggestions[activeManagedShop]||[];
+ return `<div class="workspacePageHead"><div><h2>Weekly advisor</h2><p>Publish a practical note to the owner's POS dashboard.</p></div></div><form class="workspaceForm" onsubmit="publishAdvisorTip(event)"><label class="full">Suggestion title<input name="title" maxlength="100" required placeholder="Example: Restock popular items"></label><label class="full">Actionable tip<textarea name="message" maxlength="500" required placeholder="What should the owner do next?"></textarea></label><div class="full"><button class="workspaceButton primary" type="submit">Publish suggestion</button></div></form><div class="workspaceSectionTitle"><h3>Published suggestions</h3></div><div class="workspaceList">${tips.length?tips.slice().reverse().map(tip=>`<article class="workspaceListItem"><div><strong>${escapeHTML(tip.title)}</strong><p>${escapeHTML(tip.message)}</p><small>${new Date(tip.createdAt).toLocaleDateString()}</small></div></article>`).join(""):`<div class="posEmpty">No suggestions published for this business.</div>`}</div>`;
+}
+function publishAdvisorTip(event){
+ event.preventDefault();const form=event.currentTarget,title=form.elements.title.value.trim(),message=form.elements.message.value.trim();
+ if(!title||!message)return;
+ const tips=advisorSuggestions[activeManagedShop]||[];tips.push({id:`TIP-${Date.now().toString(36).toUpperCase()}`,title,message,createdAt:Date.now()});advisorSuggestions[activeManagedShop]=tips;
+ if(!writePosLocal("mbaleAdvisorSuggestions",advisorSuggestions)){tips.pop();toast("Suggestion was not saved");return}
+ appendPosAudit("advisor_tip_published",title,activeManagedShop);renderManagedStaffSection();toast("Suggestion published locally to the owner dashboard");
+}
+function dismissAdvice(tipId){
+ dismissedAdvice[activePosShop]=[...new Set([...(dismissedAdvice[activePosShop]||[]),tipId])];
+ if(!writePosLocal("mbaleDismissedAdvice",dismissedAdvice)){toast("Could not save this read status");return}
+ renderOwnerPosSection();
+}
+function appendPosAudit(action,detail,business){
+ const entry={id:`AUD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,6)}`,business,action,detail,actor:"Demo staff",createdAt:Date.now()};
+ posAuditEntries=[...posAuditEntries,entry].slice(-500);
+ if(!writePosLocal("mbalePosAudit",posAuditEntries))console.error("Local audit entry could not be persisted",entry);
+}
+async function scanPosBarcode(){
+ if(!("BarcodeDetector" in window)||!navigator.mediaDevices?.getUserMedia){toast("Camera barcode scanning is not supported here; use product search or a connected scanner");return}
+ try{
+  const supported=typeof BarcodeDetector.getSupportedFormats==="function"?await BarcodeDetector.getSupportedFormats():["ean_13","ean_8","upc_a","upc_e","code_128"],formats=["ean_13","ean_8","upc_a","upc_e","code_128"].filter(format=>supported.includes(format));
+  if(!formats.length){toast("This camera does not support a product barcode format");return}
+  const detector=new BarcodeDetector({formats}),video=el("posScannerVideo");
+  posScanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
+  video.srcObject=posScanStream;el("posScanner").hidden=false;await video.play();
+  posScanTimer=setInterval(async()=>{
+   try{
+    const codes=await detector.detect(video);if(!codes.length)return;
+    const code=codes[0].rawValue,product=posBusinessProducts().find(item=>String(item.barcode||"")===code);
+    stopPosScanner();if(product)addPosItem(product.id);else toast(`No product matches barcode ${code}`);
+   }catch(error){console.error("Barcode scan failed",error);stopPosScanner();toast("Barcode scan failed; use product search")}
+  },450);
+ }catch(error){console.error("Camera access failed",error);stopPosScanner();toast("Camera could not be opened; check browser permission or use search")}
+}
+function stopPosScanner(){
+ if(posScanTimer){clearInterval(posScanTimer);posScanTimer=null}
+ if(posScanStream){posScanStream.getTracks().forEach(track=>track.stop());posScanStream=null}
+ const video=el("posScannerVideo");if(video)video.srcObject=null;
+ const scanner=el("posScanner");if(scanner)scanner.hidden=true;
+}
+function updateWorkspaceConnection(){
+ const status=el("workspaceConnectionStatus");if(!status)return;
+ status.textContent=currentPosStatus();status.classList.toggle("offline",!navigator.onLine);
+}
+window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();deferredInstallPrompt=event});
+async function installMbaleApp(){
+ if(!deferredInstallPrompt){toast("Use your browser menu to install this app");return}
+ const promptEvent=deferredInstallPrompt;
+ try{promptEvent.prompt();await promptEvent.userChoice}catch(error){console.error("App installation prompt failed",error);toast("Could not start installation")}
+ deferredInstallPrompt=null;
+ if(el("modal")?.querySelector(".workspaceScreen")){const isStaff=el("modal").querySelector(".workspaceBrand small")?.textContent==="MANAGED OPERATIONS";if(isStaff)showManagedStaff(managedStaffSection);else showOwnerPOS(ownerPosSection)}
+}
+window.addEventListener("appinstalled",()=>{deferredInstallPrompt=null;toast("Mbale Shopper was installed")});
+window.addEventListener("online",updateWorkspaceConnection);
+window.addEventListener("offline",updateWorkspaceConnection);
+if("serviceWorker" in navigator){
+ window.addEventListener("load",()=>navigator.serviceWorker.register("./service-worker.js").catch(error=>{console.error("PWA service worker registration failed",error);toast("Offline app shell could not be installed")}));
+}
 function goHome(){if(!el("productPage").hidden){closeProductPage();return}window.scrollTo({top:0,behavior:"smooth"})}
 initCategories();initSearchPromptTrack();initCategoryMegaMenu();renderHeroPromos();renderCategories();renderDeals();renderRecommendations();renderSpotlight("eventSpotlight","UPCOMING EVENTS",eventSpotlightItems,"event");renderSpotlight("influencerSpotlight","TOP CITY INFLUENCERS",influencerSpotlightItems,"influencer");renderServiceCategories();renderServiceFilters();renderServices();renderPartners();initSellerFilter();renderCatalog();updateCartBadge();updateMessageNotification();resumeSearchPromptRotation();
-const initialProductId=Number(location.hash.match(/^#product-(\d+)$/)?.[1]);if(initialProductId)openProduct(initialProductId,true);
+const routedShop=findShopRoute();
+if(routedShop)showPublicStorefront(routedShop);else{const initialProductId=Number(location.hash.match(/^#product-(\d+)$/)?.[1]);if(initialProductId)openProduct(initialProductId,true)}

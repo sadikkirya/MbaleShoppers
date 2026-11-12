@@ -1,0 +1,245 @@
+.workspaceScreen{color:var(--ink);font-family:inherit}
+#modal:has(.workspaceScreen){width:min(1280px,100%);max-width:none;height:min(900px,calc(100dvh - 28px));padding:0;overflow:hidden;border-radius:16px}
+#modalWrap.posFullscreen{position:fixed;inset:0;z-index:120;padding:0;background:#f5f7fa}
+#modalWrap.posFullscreen #modal{width:100%;height:100dvh;max-width:none;max-height:none;border-radius:0;overflow:hidden}
+#modalWrap.posFullscreen .workspaceScreen{height:100dvh}
+.workspaceScreen{display:flex;flex-direction:column;height:100%;min-height:0;background:#f5f7fa}
+.workspaceHeader{display:flex;align-items:center;gap:14px;min-height:76px;padding:13px 20px;background:#fff;border-bottom:1px solid var(--line)}
+.workspaceBrand{min-width:175px}
+.workspaceBrand small{display:block;color:var(--green);font-size:10px;font-weight:850;letter-spacing:.11em}
+.workspaceBrand h1{margin:3px 0 0;font-size:21px;line-height:1.15}
+.workspaceNavToggle{display:none}
+.workspaceNavBackdrop{display:none}
+.workspaceHeaderBusiness{display:flex;align-items:center;gap:8px;margin-left:auto;color:var(--muted);font-size:12px;font-weight:700}
+.workspaceHeaderBusiness select{max-width:min(32vw,260px);min-height:42px;padding:8px 30px 8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);font:inherit}
+.workspaceStatus{display:flex;align-items:center;gap:7px;padding:8px 10px;border-radius:999px;background:#ecfdf3;color:#067647;font-size:11px;font-weight:800;white-space:nowrap}
+.workspaceStatus.offline{background:#fff4e5;color:#b54708}
+.workspaceStatus::before{width:7px;height:7px;border-radius:50%;background:currentColor;content:""}
+.workspaceClose{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:9px;background:#f2f4f7;color:var(--ink);font-size:24px}
+.workspaceTabs{display:flex;gap:5px;flex:none;padding:9px 16px;background:#fff;border-bottom:1px solid var(--line);overflow-x:auto}
+.workspaceTab{display:flex;align-items:center;justify-content:center;gap:7px;min-height:42px;padding:0 13px;border-radius:8px;background:transparent;color:#475467;font-size:12px;font-weight:750;white-space:nowrap}
+.workspaceTab:hover{background:#f2f4f7}
+.workspaceTab.active{background:#e8f5ef;color:#067647}
+.workspaceBody{flex:1;min-height:0;padding:18px;overflow:auto}
+.workspaceNotice{display:flex;align-items:flex-start;gap:9px;padding:12px 14px;border:1px solid #fedf89;border-radius:10px;background:#fffaeb;color:#7a2e0e;font-size:12px;line-height:1.5}
+.workspaceNotice strong{color:#7a2e0e}
+.workspacePageHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:0 0 16px}
+.workspacePageHead h2{margin:0;font-size:21px}
+.workspacePageHead p{margin:5px 0 0;color:var(--muted);font-size:12px}
+.workspaceButton{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:42px;padding:0 13px;border:0;border-radius:8px;background:var(--ink);color:#fff;font-size:12px;font-weight:800}
+.workspaceButton.primary{background:var(--green)}
+.workspaceButton.secondary{border:1px solid var(--line);background:#fff;color:var(--ink)}
+.workspaceButton:disabled{opacity:.5;cursor:not-allowed}
+.posSaleLayout{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(320px,.82fr);gap:16px;align-items:start}
+.posCatalogPanel,.posCheckoutPanel,.workspaceCard{min-width:0;padding:16px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.posCatalogToolbar{display:flex;align-items:center;gap:8px}
+.posCatalogToolbar input{flex:1;min-width:0;height:44px;padding:0 12px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px}
+.posCategoryRail{display:flex;gap:7px;margin:13px 0;overflow-x:auto;padding-bottom:3px}
+.posCategoryButton{flex:none;min-height:38px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:#fff;color:#475467;font-size:11px;font-weight:750}
+.posCategoryButton.active{border-color:var(--green);background:#e8f5ef;color:#067647}
+.posProductGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.posProductCard{display:flex;flex-direction:column;min-width:0;min-height:176px;padding:0;border:1px solid var(--line);border-radius:10px;background:#fff;text-align:left;overflow:hidden}
+.posProductCard:hover:not(:disabled){border-color:var(--green);box-shadow:0 4px 14px #10182812}
+.posProductCard:disabled{opacity:.58;cursor:not-allowed}
+.posProductCard img{width:100%;height:90px;object-fit:cover;background:#f2f4f7}
+.posProductCopy{display:grid;gap:4px;padding:9px}
+.posProductCopy strong{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;font-size:11px;line-height:1.3}
+.posProductCopy span{color:var(--green);font-size:12px;font-weight:850}
+.posProductCopy small{color:var(--muted);font-size:10px}
+.posCheckoutPanel{position:sticky;top:0}
+.posCurrentSale{padding:18px;border-color:#dcebe3;box-shadow:0 12px 30px #174c3510}
+.posCurrentSale .posCheckoutHead{padding:0 0 15px;border-bottom:1px solid #e8eee9}
+.posCheckoutTitle>span{display:block;margin-bottom:4px;color:#17804f;font-size:9px;font-weight:900;letter-spacing:.14em}
+.posCheckoutTitle h2{font-size:20px}
+.posItemCount{display:inline-flex;align-items:center;gap:5px;padding:7px 10px;border:1px solid #dcebe3;border-radius:999px;background:#f1f8f4;color:#52665a;font-size:11px;font-weight:700}
+.posItemCount strong{color:#087443;font-size:12px}
+.posCheckoutHead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.posCheckoutClose{display:none}
+.posCheckoutHead h2{margin:0;font-size:17px}
+.posCheckoutHead span{color:var(--muted);font-size:11px}
+.posCartRows{display:grid;gap:10px;max-height:28vh;min-height:78px;margin:12px 0;overflow:auto}
+.posCurrentSale .posCartRows{gap:8px;max-height:30vh;min-height:116px;margin:13px 0}
+.posCartEmpty{align-content:center;gap:6px;min-height:116px!important;padding:14px;border:1px dashed #cfded4;border-radius:11px;background:linear-gradient(145deg,#f8fbf9,#f2f7f3);color:#66776c}
+.posCartEmpty strong{color:#344b3b;font-size:12px}
+.posCartEmpty>span:last-child{font-size:10px}
+.posCartEmpty .posCartEmptyIcon{display:grid;width:32px;height:32px;margin:0 auto 2px;place-items:center;border-radius:10px;background:#e2f1e7;color:#13804e;font-size:21px;font-weight:500}
+.posCartRow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;padding-bottom:9px;border-bottom:1px solid #f0f1f3}
+.posCurrentSale .posCartRow{display:flex;align-items:center;gap:7px;padding:9px;border:1px solid #edf1ed;border-radius:10px;background:#fbfcfb}
+.posCurrentSale .posCartRow>strong{flex:1 1 auto;min-width:0;overflow:hidden;color:#27382d;font-size:11px;text-overflow:ellipsis;white-space:nowrap}
+.posCartRow strong{font-size:12px}
+.posCartRow small{color:var(--muted);font-size:10px}
+.posCartRowTotal{font-size:12px;font-weight:800}
+.posQuantity{display:flex;align-items:center;gap:9px;grid-column:1 / -1}
+.posCurrentSale .posCartRow small,.posCurrentSale .posCartRowTotal{flex:none;font-size:9px;white-space:nowrap}
+.posCurrentSale .posCartRowTotal{color:#344b3b;font-size:10px}
+.posCurrentSale .posQuantity{flex:none;gap:3px;margin:0}
+.posCurrentSale .posQuantity button:not(.workspaceButton){width:26px;height:28px;padding:0;border-color:#e1e8e2;border-radius:7px;background:#fff;color:#344b3b;font-size:16px;font-weight:700;transition:background .15s,border-color .15s}
+.posCurrentSale .posQuantity button:not(.workspaceButton):hover{border-color:#9ac8a9;background:#f1f8f4}
+.posCurrentSale .posQuantity span{min-width:14px;color:#344b3b;font-size:11px}
+.posCurrentSale .posRemoveItemButton{display:grid;flex:none;width:25px;min-height:28px!important;margin-left:1px;padding:0;place-items:center;border-color:transparent;background:transparent;color:#9b3b3b;font-size:18px;line-height:1}
+.posCurrentSale .posRemoveItemButton:hover{background:#fff1f0;color:#b42318}
+.posQuantity button{width:34px;height:34px;border:1px solid var(--line);border-radius:7px;background:#fff;font-size:18px}
+.posQuantity span{min-width:20px;text-align:center;font-size:12px;font-weight:800}
+.posTotalRow{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-top:1px solid var(--line);font-size:13px}
+.posCurrentSale .posSaleTotal{margin:0 0 13px;padding:13px 14px;border:1px solid #dcebe3;border-radius:11px;background:linear-gradient(120deg,#f2f8f4,#eaf5ee);color:#405347;font-size:12px;font-weight:750}
+.posCurrentSale .posSaleTotal strong{color:#126b40;font-size:21px;letter-spacing:-.02em}
+.posTotalRow strong{font-size:19px}
+.posPaymentModes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:10px 0}
+.posCurrentSale .posPaymentModes{gap:8px;margin:0 0 12px}
+.posPaymentMode{min-height:42px;border:1px solid var(--line);border-radius:8px;background:#fff;color:#344054;font-size:11px;font-weight:750}
+.posCurrentSale .posPaymentMode{min-height:43px;border-color:#e6ebe7;border-radius:9px;background:#fff;font-size:11px;transition:background .15s,border-color .15s,color .15s,box-shadow .15s}
+.posCurrentSale .posPaymentMode:hover{border-color:#a6cbb2;background:#f8fbf9}
+.posPaymentMode.active{border-color:var(--green);background:#e8f5ef;color:#067647}
+.posCurrentSale .posPaymentMode.active{border-color:#17804f;background:#eaf5ee;color:#087443;box-shadow:inset 0 0 0 1px #17804f}
+.posCheckoutFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.posCheckoutFields label,.workspaceForm label{display:grid;gap:5px;color:#475467;font-size:11px;font-weight:750}
+.posCheckoutFields input,.workspaceForm input,.workspaceForm select,.workspaceForm textarea{width:100%;min-height:40px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink);font:inherit;font-size:12px}
+.posCheckoutFields .full,.workspaceForm .full{grid-column:1/-1}
+.posChangeDue{margin:9px 0;color:var(--green);font-size:11px;font-weight:800;text-align:right}
+.posCompleteButton{width:100%;min-height:48px;margin-top:12px;border:0;border-radius:9px;background:var(--yellow);color:#111827;font-size:13px;font-weight:900}
+.posCurrentSale .posCompleteButton{min-height:50px;border-radius:10px;background:linear-gradient(100deg,#16834f,#086b40);box-shadow:0 5px 12px #08744324;color:#fff;transition:filter .15s,transform .15s,box-shadow .15s}
+.posCurrentSale .posCompleteButton:hover:not(:disabled){filter:brightness(1.05);transform:translateY(-1px);box-shadow:0 8px 16px #08744330}
+.posCurrentSale .posCompleteButton:disabled{background:#d9e3dc;box-shadow:none;color:#718078}
+.posEmpty{display:grid;min-height:130px;place-items:center;color:var(--muted);font-size:12px;text-align:center}
+.posMetricGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin:15px 0}
+.posMetric{padding:14px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.posMetric span,.posMetric small{display:block;color:var(--muted);font-size:10px}
+.posMetric strong{display:block;margin:7px 0;font-size:18px;overflow-wrap:anywhere}
+.workspaceTableWrap{width:100%;overflow:auto;border:1px solid var(--line);border-radius:9px;background:#fff}
+.workspaceTable{width:100%;border-collapse:collapse;font-size:11px}
+.workspaceTable th,.workspaceTable td{padding:10px;text-align:left;vertical-align:middle;border-bottom:1px solid #eef0f3}
+.workspaceTable th{background:#f9fafb;color:#475467;font-size:10px;white-space:nowrap}
+.workspaceTable tr:last-child td{border-bottom:0}
+.workspaceTable small{display:block;margin-top:3px;color:var(--muted);font-size:10px}
+.workspaceTable input,.workspaceTable select{width:105px;min-height:36px;padding:5px 7px;border:1px solid var(--line);border-radius:6px;font:inherit}
+.workspaceTable .workspaceTableProduct{min-width:190px}
+.workspaceTableProduct strong{display:block}
+.workspaceList{display:grid;gap:9px}
+.workspaceListItem{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:13px;border:1px solid var(--line);border-radius:9px;background:#fff}
+.workspaceListItem strong{display:block;font-size:12px}
+.workspaceListItem p{margin:5px 0;color:var(--muted);font-size:11px;line-height:1.5}
+.workspaceListItem small{color:var(--muted);font-size:10px}
+.workspaceForm{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;max-width:760px;padding:15px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.workspaceForm textarea{min-height:80px;resize:vertical}
+.workspaceForm .full{grid-column:1/-1}
+.workspaceHint{margin:10px 0 0;color:var(--muted);font-size:11px;line-height:1.5}
+.workspaceSectionTitle{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:19px 0 10px}
+.workspaceSectionTitle h3{margin:0;font-size:14px}
+.workspaceStatusPill{display:inline-flex;align-items:center;padding:5px 8px;border-radius:999px;background:#ecfdf3;color:#067647;font-size:10px;font-weight:800}
+.workspaceStatusPill.warning{background:#fff4e5;color:#b54708}
+.workspaceStatusPill.danger{background:#fef3f2;color:#b42318}
+.posPaymentWarning{display:grid;gap:3px;margin:9px 0;padding:9px 10px;border:1px solid #fedf89;border-radius:8px;background:#fffaeb;color:#7a2e0e;font-size:10px;line-height:1.45}
+.posPaymentWarning strong{font-size:11px}
+.posSaleActions{display:flex;gap:8px;margin-top:8px}
+.posSaleActions .workspaceButton{flex:1}
+.posMobileCartBar,.posCheckoutBackdrop{display:none}
+.posKeyboardHint{margin:9px 0 0;color:var(--muted);font-size:10px;text-align:center}
+.posKeyboardHint kbd{padding:2px 4px;border:1px solid var(--line);border-radius:4px;background:#f9fafb;color:#344054;font:inherit;font-weight:800}
+.posParkedActions{display:flex;gap:7px;flex:none}
+.posDashboardHead{align-items:center;margin-top:16px}
+.posDashboardMetrics .posMetric{min-height:120px}
+.posDashboardGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin:14px 0}
+.posDashboardGrid .workspaceCard{padding:14px}
+.posDashboardGrid .workspaceSectionTitle{margin-top:0}
+.posDashboardAdvice{margin-top:13px}
+.posDashboardAdvice .workspaceListItem{margin-top:8px}
+.posDashboardAdvice .workspaceListItem p{max-width:680px}
+.posScanner{position:fixed;z-index:150;inset:0;display:grid;place-items:center;padding:20px;background:#101828d9}
+.posScanner[hidden]{display:none}
+.posScannerCard{width:min(500px,100%);padding:16px;border-radius:12px;background:#fff}
+.posScannerCard video{width:100%;max-height:55vh;border-radius:8px;background:#111}
+.posInvoicePreview{max-width:240px;max-height:180px;border-radius:8px;object-fit:contain}
+.posReceiptPaper{max-width:420px;margin:20px auto;padding:24px;background:#fff;color:#111;font-family:monospace}
+.posReceiptPaper h2,.posReceiptPaper p{text-align:center}
+.posReceiptPaper hr{border:0;border-top:1px dashed #555}
+.posReceiptLine{display:flex;justify-content:space-between;gap:10px;margin:8px 0;font-size:12px}
+.posReceiptFooter{margin-top:20px;text-align:center;font-size:11px}
+@media(max-width:900px){
+  #modal:has(.workspaceScreen){height:calc(100dvh - 12px)}
+  .posSaleLayout{grid-template-columns:minmax(0,1fr)}
+  .posCheckoutPanel{position:static}
+  .posProductGrid{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .posDashboardMetrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:620px){
+  #modal:has(.workspaceScreen){width:100%;height:100dvh;border-radius:0}
+  #modalWrap.posFullscreen #modal{height:100dvh}
+  .workspaceHeader{gap:8px;min-height:66px;padding:9px 10px}
+  .ownerPosWorkspace .workspaceHeader{gap:6px;padding:8px}
+  .ownerPosWorkspace .workspaceNavToggle{display:grid;flex:none;width:36px;height:38px;place-items:center;border:1px solid #e6ebe7;border-radius:9px;background:#fff;color:#344b3b;font-size:19px}
+  .workspaceBrand{min-width:0;flex:1}
+  .workspaceBrand h1{font-size:16px}
+  .workspaceBrand small{font-size:8px}
+  .workspaceHeaderBusiness{gap:4px;margin-left:0}
+  .workspaceHeaderBusiness>span{display:none}
+  .workspaceHeaderBusiness select{max-width:38vw;min-height:38px;padding:6px;font-size:10px}
+  .workspaceStatus{padding:7px;font-size:0}
+  .workspaceStatus::before{width:9px;height:9px}
+  .workspaceClose{width:36px;height:36px}
+  .workspaceTabs{padding:7px 8px}
+  .workspaceTab{min-height:40px;padding:0 10px;font-size:10px}
+  .ownerPosWorkspace .workspaceTabs{position:fixed;inset:0 auto 0 0;z-index:132;display:flex;width:min(82vw,300px);flex-direction:column;align-items:stretch;justify-content:flex-start;gap:6px;padding:calc(14px + env(safe-area-inset-top)) 12px calc(14px + env(safe-area-inset-bottom));overflow-y:auto;border:0;background:#fff;box-shadow:12px 0 34px #10182826;transform:translateX(-105%);visibility:hidden;transition:transform .22s ease}
+  .ownerPosWorkspace .workspaceTab{justify-content:flex-start;min-height:48px;padding:0 13px;border-radius:9px;font-size:13px}
+  .ownerPosWorkspace.ownerPosNavOpen .workspaceTabs{transform:translateX(0);visibility:visible}
+  .ownerPosWorkspace .workspaceNavBackdrop{position:fixed;inset:0;z-index:131;display:none;border:0;background:#10182880}
+  .ownerPosWorkspace.ownerPosNavOpen .workspaceNavBackdrop{display:block}
+  .workspaceBody{padding:10px}
+  .workspacePageHead{display:grid}
+  .workspacePageHead h2{font-size:18px}
+  .posCatalogPanel,.posCheckoutPanel,.workspaceCard{padding:11px}
+  .posProductGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .posProductCard{min-height:160px}
+  .posProductCard img{height:82px}
+  .posMetricGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .posMetric{padding:10px}
+  .posMetric strong{font-size:15px}
+  .posDashboardHead{align-items:start}
+  .posDashboardGrid{grid-template-columns:minmax(0,1fr);gap:8px}
+  .posDashboardMetrics .posMetric{min-height:104px}
+  .posParkedActions{flex-wrap:wrap}
+  .posSaleActions{flex-direction:column}
+  .ownerPosWorkspace .posSaleLayout{grid-template-columns:minmax(0,1fr)}
+  .ownerPosWorkspace .posCheckoutPanel{display:none}
+  .ownerPosWorkspace .posCheckoutBackdrop{position:fixed;inset:0;z-index:124;display:none;border:0;background:#10182880}
+  .ownerPosWorkspace.mobileCheckoutOpen .posCheckoutBackdrop{display:block}
+  .ownerPosWorkspace.mobileCheckoutOpen .posCurrentSale{position:fixed;inset:auto 8px calc(8px + env(safe-area-inset-bottom));z-index:126;display:block;width:auto;max-height:calc(100dvh - 54px - env(safe-area-inset-top));padding:16px;overflow-y:auto;border:1px solid #dcebe3;border-radius:18px;box-shadow:0 20px 60px #10182840;animation:posSheetIn .2s ease-out}
+  .ownerPosWorkspace .posCheckoutHead{padding-bottom:12px}
+  .ownerPosWorkspace .posCheckoutClose{display:grid;flex:none;width:34px;height:34px;place-items:center;border:0;border-radius:9px;background:#f2f4f7;color:#344054;font-size:22px}
+  .ownerPosWorkspace .posCurrentSale .posCartRows{max-height:22vh;min-height:90px}
+  .ownerPosWorkspace .posMobileCartBar{position:fixed;inset:auto 0 0;z-index:123;display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:68px;padding:10px 16px calc(10px + env(safe-area-inset-bottom));border:0;border-top:1px solid #e3ebe5;background:#fff;box-shadow:0 -8px 22px #10182812;text-align:left}
+  .ownerPosWorkspace .posMobileCartBar>span:first-child{display:grid;gap:3px}
+  .ownerPosWorkspace .posMobileCartBar small{color:#66756a;font-size:10px;font-weight:700}
+  .ownerPosWorkspace .posMobileCartBar strong{color:#126b40;font-size:17px}
+  .ownerPosWorkspace .posMobileCartAction{display:flex;align-items:center;gap:8px;color:#087443;font-size:12px;font-weight:850}
+  .ownerPosWorkspace .posMobileCartAction b{display:grid;width:29px;height:29px;place-items:center;border-radius:9px;background:#eaf5ee;font-size:17px}
+  #ownerPosBody:has(.posMobileCartBar){padding-bottom:calc(88px + env(safe-area-inset-bottom))}
+  .workspaceForm{grid-template-columns:1fr;padding:11px}
+  .workspaceForm .full{grid-column:auto}
+  .workspaceTable th,.workspaceTable td{padding:8px 7px}
+}
+@media(max-width:380px){
+  .workspaceHeader{gap:5px}
+  .ownerPosWorkspace .workspaceHeader{gap:4px;padding:7px}
+  .ownerPosWorkspace .workspaceNavToggle{width:33px;height:36px}
+  .workspaceHeaderBusiness select{max-width:34vw}
+  .ownerPosWorkspace .workspaceHeaderBusiness select{max-width:31vw}
+  .posPaymentModes{gap:5px}
+  .posCheckoutFields{grid-template-columns:1fr}
+  .posCheckoutFields .full{grid-column:auto}
+  .ownerPosWorkspace.mobileCheckoutOpen .posCurrentSale{inset-inline:5px;padding:12px}
+}
+@keyframes posSheetIn{from{transform:translateY(12px);opacity:.7}to{transform:translateY(0);opacity:1}}
+@media(prefers-reduced-motion:reduce){.ownerPosWorkspace .workspaceTabs,.ownerPosWorkspace.mobileCheckoutOpen .posCurrentSale{transition:none;animation:none}}
+@media(max-height:700px) and (min-width:621px){
+  .workspaceHeader{min-height:62px;padding:8px 16px}
+  .workspaceTabs{padding:6px 12px}
+  .workspaceBody{padding:12px}
+  .posDashboardMetrics .posMetric{min-height:96px;padding:10px}
+}
+@media print{
+  body.printingPosReceipt *{visibility:hidden!important}
+  body.printingPosReceipt .posReceiptPaper,body.printingPosReceipt .posReceiptPaper *{visibility:visible!important}
+  body.printingPosReceipt .posReceiptPaper{position:absolute;inset:0 auto auto 0;width:58mm;max-width:58mm;margin:0;padding:4mm}
+  body.printingPosReceipt .posReceiptPaper.wide{width:80mm;max-width:80mm}
+  body.printingPosReceipt .posReceiptActions{display:none!important}
+}
