@@ -128,6 +128,17 @@
 .workspaceStatusPill{display:inline-flex;align-items:center;padding:5px 8px;border-radius:999px;background:#ecfdf3;color:#067647;font-size:10px;font-weight:800}
 .workspaceStatusPill.warning{background:#fff4e5;color:#b54708}
 .workspaceStatusPill.danger{background:#fef3f2;color:#b42318}
+.staffTaskGrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
+.staffTaskCard{display:grid;gap:6px;min-width:0;padding:13px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);text-align:left}
+.staffTaskCard:hover{border-color:#9fcbb2;background:#f8fcf9}
+.staffTaskCard.needsAttention{border-color:#f5c46b;background:#fffcf5}
+.staffTaskCard span{font-size:11px;font-weight:750}
+.staffTaskCard strong{font-size:22px}
+.staffTaskCard small{color:var(--muted);font-size:10px}
+.workspaceQueueTools{display:flex;align-items:end;gap:10px;margin:12px 0}
+.workspaceQueueTools label{display:grid;gap:5px;min-width:min(280px,100%);color:#475467;font-size:11px;font-weight:750}
+.workspaceQueueTools input,.workspaceQueueTools select{width:100%;min-height:40px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink);font:inherit;font-size:12px}
+.workspaceListItem[hidden],.workspaceTable tr[hidden],[data-queue-empty][hidden]{display:none}
 .posPaymentWarning{display:grid;gap:3px;margin:9px 0;padding:9px 10px;border:1px solid #fedf89;border-radius:8px;background:#fffaeb;color:#7a2e0e;font-size:10px;line-height:1.45}
 .posPaymentWarning strong{font-size:11px}
 .posSaleActions{display:flex;gap:8px;margin-top:8px}
@@ -191,6 +202,9 @@
   .posProductCard{min-height:160px}
   .posProductCard img{height:82px}
   .posMetricGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .staffTaskGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .workspaceQueueTools{display:grid;grid-template-columns:1fr}
+  .workspaceQueueTools label{min-width:0}
   .posMetric{padding:10px}
   .posMetric strong{font-size:15px}
   .posDashboardHead{align-items:start}
